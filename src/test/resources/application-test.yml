@@ -13,3 +13,10 @@ spring:
     properties:
       hibernate:
         format_sql: false
+
+invault:
+  security:
+    jwt:
+      # Fixed test-only value: Base64 of a 32-byte non-production secret.
+      secret: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      expiration: 5m

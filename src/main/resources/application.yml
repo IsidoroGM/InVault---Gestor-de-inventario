@@ -7,3 +7,14 @@ spring:
 
 server:
   port: 8080
+
+invault:
+  security:
+    jwt:
+      issuer: ${INVAULT_JWT_ISSUER:https://api.invault.local}
+      expiration: 30m
+    bootstrap-admin:
+      enabled: ${INVAULT_BOOTSTRAP_ADMIN_ENABLED:false}
+      username: ${INVAULT_BOOTSTRAP_ADMIN_USERNAME:}
+      email: ${INVAULT_BOOTSTRAP_ADMIN_EMAIL:}
+      password: ${INVAULT_BOOTSTRAP_ADMIN_PASSWORD:}

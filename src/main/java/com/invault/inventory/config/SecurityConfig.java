@@ -1,55 +1,135 @@
 package com.invault.inventory.config;
 
+import java.util.Collection;
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
-/**
- * Temporary security configuration for the API.
- * For now, only /api/health is public and the rest of the API remains protected.
- */
+import com.invault.inventory.auth.InVaultUserDetailsService;
+
 @Configuration
 public class SecurityConfig {
 
+    private static final String ADMIN = "ADMIN";
+    private static final String SUPERVISOR = "SUPERVISOR";
+    private static final String WAREHOUSE = "WAREHOUSE";
+    private static final String READ_ONLY = "READ_ONLY";
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+
         return http
-                // Enables CORS support using the CorsConfig bean.
                 .cors(Customizer.withDefaults())
-
-                // CSRF is disabled because this backend will expose a stateless REST API.
                 .csrf(AbstractHttpConfigurer::disable)
-
-                // Defines which endpoints are public and which require authentication.
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health").permitAll()
-                        .anyRequest().authenticated()
+                .requestCache(AbstractHttpConfigurer::disable)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/health", "/api/auth/login", "/error").permitAll()
 
-                // Temporary authentication mechanisms while JWT is not implemented.
-                .httpBasic(Customizer.withDefaults())
-                .formLogin(Customizer.withDefaults())
+                        // Every official role can consult inventory information.
+                        .requestMatchers(HttpMethod.GET, "/api/**")
+                        .hasAnyRole(ADMIN, SUPERVISOR, WAREHOUSE, READ_ONLY)
 
+                        // Warehouse staff can execute auditable stock movements.
+                        .requestMatchers(HttpMethod.POST, "/api/stock/movements")
+                        .hasAnyRole(ADMIN, SUPERVISOR, WAREHOUSE)
+
+                        // Catalogue and product maintenance is restricted to management roles.
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/units",
+                                "/api/categories",
+                                "/api/locations",
+                                "/api/suppliers",
+                                "/api/products",
+                                "/api/batches")
+                        .hasAnyRole(ADMIN, SUPERVISOR)
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/units/**",
+                                "/api/categories/**",
+                                "/api/locations/**",
+                                "/api/suppliers/**",
+                                "/api/products/**",
+                                "/api/batches/**")
+                        .hasAnyRole(ADMIN, SUPERVISOR)
+                        .requestMatchers(HttpMethod.PATCH,
+                                "/api/units/**",
+                                "/api/categories/**",
+                                "/api/locations/**",
+                                "/api/suppliers/**",
+                                "/api/products/**")
+                        .hasAnyRole(ADMIN, SUPERVISOR)
+
+                        // New endpoints must receive an explicit rule before becoming accessible.
+                        .anyRequest().denyAll()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
+                )
                 .build();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(
+            InVaultUserDetailsService userDetailsService,
+            PasswordEncoder passwordEncoder) {
+
+        DaoAuthenticationProvider authenticationProvider =
+                new DaoAuthenticationProvider(userDetailsService);
+        authenticationProvider.setPasswordEncoder(passwordEncoder);
+
+        return new ProviderManager(authenticationProvider);
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
+        authenticationConverter.setJwtGrantedAuthoritiesConverter(jwtRoleAuthoritiesConverter());
+        return authenticationConverter;
+    }
+
+    private Converter<Jwt, Collection<GrantedAuthority>> jwtRoleAuthoritiesConverter() {
+        return jwt -> {
+            List<String> roles = jwt.getClaimAsStringList("roles");
+
+            if (roles == null) {
+                return List.of();
+            }
+
+            return roles.stream()
+                    .map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role))
+                    .toList();
+        };
     }
 }
 
-
-//Explication:
-// This code defines a Spring Security configuration for a Java application. It is annotated with `@Configuration`, indicating that it is a configuration class. The `securityFilterChain` method is annotated with `@Bean`,
-// which means it will be managed by the Spring container and can be injected into other components.
-// The method takes an `HttpSecurity` object as a parameter and configures the security settings for the application.
-// It disables CSRF protection, allows unauthenticated access to the `/api/health` endpoint, and requires authentication for all other requests.
-// It also enables HTTP Basic authentication and form-based login with default settings.
-// Finally, it builds and returns a `SecurityFilterChain` object that defines the security filter chain for the application.
-
-// Este código define una configuración de Spring Security para una aplicación Java. Está anotado con `@Configuration
-// `, lo que indica que se trata de una clase de configuración. El método `securityFilterChain` está anotado con `@Bean`,
-// lo que significa que será gestionado por el contenedor Spring y podrá inyectarse en otros componentes.
-// El método toma un objeto `HttpSecurity` como parámetro y configura los ajustes de seguridad de la aplicación.
-// Desactiva la protección CSRF, permite el acceso sin autenticación al punto final `/api/health` y exige autenticación para todas las demás solicitudes.
-// Además, habilita la autenticación HTTP básica y el inicio de sesión mediante formulario con la configuración predeterminada.
-// Por último, crea y devuelve un objeto `SecurityFilterChain` que define la cadena de filtros de seguridad de la aplicación.
+/*
+ * SecurityConfig makes the REST API stateless, validates bearer JWTs and maps
+ * the four official InVault roles to explicit read and write permissions.
+ */

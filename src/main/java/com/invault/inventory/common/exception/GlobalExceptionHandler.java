@@ -1,9 +1,13 @@
 package com.invault.inventory.common.exception;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -15,6 +19,70 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * Returns a generic authentication error without identifying which credential failed.
+     */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnauthorized(
+            UnauthorizedException exception,
+            HttpServletRequest request) {
+
+        ApiErrorResponse response = new ApiErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                LocalDateTime.now()
+        );
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    /**
+     * Converts Jakarta Validation failures into a predictable field-by-field response.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiValidationErrorResponse> handleValidation(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request) {
+
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+
+        exception.getBindingResult().getFieldErrors().forEach(fieldError ->
+                fieldErrors.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage())
+        );
+
+        ApiValidationErrorResponse response = new ApiValidationErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "Request validation failed.",
+                request.getRequestURI(),
+                LocalDateTime.now(),
+                fieldErrors
+        );
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * Handles malformed JSON and invalid enum or value representations.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnreadableRequest(
+            HttpMessageNotReadableException exception,
+            HttpServletRequest request) {
+
+        ApiErrorResponse response = new ApiErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                "Request body is invalid or malformed.",
+                request.getRequestURI(),
+                LocalDateTime.now()
+        );
+
+        return ResponseEntity.badRequest().body(response);
+    }
 
     /**
      * Handles errors when a resource does not exist.
@@ -79,5 +147,6 @@ public class GlobalExceptionHandler {
 
 /*
  * This class is the global error manager of the API.
- * Instead of letting Spring return default technical errors, it transforms exceptions into clear JSON responses.
+ * Instead of letting Spring return default technical errors, it transforms
+ * exceptions and request validation failures into clear JSON responses.
  */

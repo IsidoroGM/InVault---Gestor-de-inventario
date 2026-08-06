@@ -14,3 +14,8 @@ spring:
     properties:
       hibernate:
         format_sql: false
+
+invault:
+  security:
+    jwt:
+      secret: ${INVAULT_JWT_SECRET}
