@@ -7,8 +7,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -21,6 +23,8 @@ import com.invault.inventory.batches.Batch;
 import com.invault.inventory.batches.BatchRepository;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
+import com.invault.inventory.realtime.InventoryEventType;
+import com.invault.inventory.realtime.StockMovementRecordedEvent;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.suppliers.SupplierRepository;
@@ -47,6 +51,9 @@ class StockServiceTests {
 
     @Mock
     private StockMovementMapper stockMovementMapper;
+
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
     private StockService stockService;
@@ -76,6 +83,16 @@ class StockServiceTests {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         StockMovementResponseDTO response = new StockMovementResponseDTO();
+        response.setId(10L);
+        response.setProductId(1L);
+        response.setProductSku("RAW-001");
+        response.setBatchId(2L);
+        response.setBatchCode("LOT-001");
+        response.setMovementType(MovementType.INBOUND);
+        response.setQuantity(new BigDecimal("3.000"));
+        response.setPreviousBatchQuantity(new BigDecimal("5.000"));
+        response.setNewBatchQuantity(new BigDecimal("8.000"));
+        response.setMovementDate(LocalDateTime.of(2026, 8, 6, 19, 30));
         when(stockMovementMapper.toResponseDTO(any(StockMovement.class))).thenReturn(response);
 
         assertSame(response, stockService.createMovement(request, 9L));
@@ -90,6 +107,16 @@ class StockServiceTests {
         assertEquals(new BigDecimal("8.000"), savedMovement.getNewBatchQuantity());
         assertEquals("Authenticated receipt", savedMovement.getReason());
         verify(userRepository).findById(9L);
+
+        ArgumentCaptor<StockMovementRecordedEvent> eventCaptor =
+                ArgumentCaptor.forClass(StockMovementRecordedEvent.class);
+        verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
+
+        assertEquals(InventoryEventType.STOCK_UPDATED, eventCaptor.getValue().payload().eventType());
+        assertEquals(10L, eventCaptor.getValue().payload().movementId());
+        assertEquals(1L, eventCaptor.getValue().payload().productId());
+        assertEquals(2L, eventCaptor.getValue().payload().batchId());
+        assertEquals(new BigDecimal("8.000"), eventCaptor.getValue().payload().newBatchQuantity());
     }
 }
 

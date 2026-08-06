@@ -47,6 +47,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/health", "/api/auth/login", "/error").permitAll()
+                        // The STOMP CONNECT frame performs JWT authentication.
+                        .requestMatchers("/ws", "/ws/**").permitAll()
 
                         // Every official role can consult inventory information.
                         .requestMatchers(HttpMethod.GET, "/api/**")
