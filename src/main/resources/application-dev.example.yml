@@ -17,3 +17,16 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+invault:
+  security:
+    jwt:
+      # Base64-encoded secret containing at least 32 random bytes.
+      # Keep the real value in the INVAULT_JWT_SECRET environment variable.
+      secret: ${INVAULT_JWT_SECRET}
+    bootstrap-admin:
+      # Optional one-time bootstrap. The account is not modified if it already exists.
+      enabled: ${INVAULT_BOOTSTRAP_ADMIN_ENABLED:false}
+      username: ${INVAULT_BOOTSTRAP_ADMIN_USERNAME:}
+      email: ${INVAULT_BOOTSTRAP_ADMIN_EMAIL:}
+      password: ${INVAULT_BOOTSTRAP_ADMIN_PASSWORD:}

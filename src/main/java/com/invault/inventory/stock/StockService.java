@@ -84,10 +84,13 @@ public class StockService {
         return stockMovementMapper.toResponseDTO(stockMovement);
     }
 
-    public StockMovementResponseDTO createMovement(StockMovementRequestDTO requestDTO) {
+    public StockMovementResponseDTO createMovement(
+            StockMovementRequestDTO requestDTO,
+            Long authenticatedUserId) {
+
         Product product = findActiveProductById(requestDTO.getProductId());
         Batch batch = findBatchEntityById(requestDTO.getBatchId());
-        User user = findUserEntityById(requestDTO.getUserId());
+        User user = findUserEntityById(authenticatedUserId);
         Supplier supplier = findOptionalSupplierById(requestDTO.getSupplierId());
 
         validateBatchBelongsToProduct(batch, product);
@@ -159,7 +162,7 @@ public class StockService {
 
     private User findUserEntityById(Long userId) {
         if (userId == null) {
-            throw new BadRequestException("User id is required.");
+            throw new BadRequestException("Authenticated user id is required.");
         }
 
         return userRepository.findById(userId)
@@ -282,4 +285,6 @@ public class StockService {
  * En InVault el stock no se modifica directamente desde Product. El stock se
  * controla mediante lotes y movimientos auditables, lo que permite reconstruir
  * el historial de cambios del inventario.
+ * El usuario responsable procede siempre del JWT autenticado y nunca del cuerpo
+ * enviado por el cliente.
  */
