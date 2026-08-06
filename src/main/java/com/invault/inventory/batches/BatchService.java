@@ -85,8 +85,12 @@ public class BatchService {
         // Actualizamos los campos editables del lote.
         batch.setProduct(product);
         batch.setBatchCode(normalizedBatchCode);
-        batch.setStatus(requestDTO.getStatus());
         batch.setNotes(normalizeText(requestDTO.getNotes()));
+
+        // Un estado omitido conserva el valor actual y evita reactivar el lote.
+        if (requestDTO.getStatus() != null) {
+            batch.setStatus(requestDTO.getStatus());
+        }
 
         // La cantidad existente se conserva. Solo StockService puede modificarla.
 
