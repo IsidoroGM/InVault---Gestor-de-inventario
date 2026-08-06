@@ -1,10 +1,7 @@
 package com.invault.inventory.batches.dto;
 
-import java.math.BigDecimal;
-
 import com.invault.inventory.batches.BatchStatus;
 
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -25,11 +22,6 @@ public class BatchRequestDTO {
     @NotBlank(message = "Batch code is required.")
     @Size(max = 100, message = "Batch code cannot exceed 100 characters.")
     private String batchCode;
-
-    // Current quantity stored in this batch.
-    @NotNull(message = "Batch quantity is required.")
-    @DecimalMin(value = "0.000", message = "Batch quantity cannot be negative.")
-    private BigDecimal quantity;
 
     // Optional batch status. If null, the entity can keep its default value.
     private BatchStatus status;
@@ -57,14 +49,6 @@ public class BatchRequestDTO {
         this.batchCode = batchCode;
     }
 
-    public BigDecimal getQuantity() {
-        return quantity;
-    }
-
-    public void setQuantity(BigDecimal quantity) {
-        this.quantity = quantity;
-    }
-
     public BatchStatus getStatus() {
         return status;
     }
@@ -86,5 +70,6 @@ public class BatchRequestDTO {
  * Explanation:
  * BatchRequestDTO is used as the input model for Batch operations.
  * It receives productId instead of a full Product object because the service layer
- * will be responsible for loading the related Product from the database.
+ * will be responsible for loading the related Product from the database. Quantity
+ * is intentionally excluded because stock can only change through StockService.
  */

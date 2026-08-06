@@ -6,34 +6,22 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository responsible for database operations related to Category entities.
- *
- * Spring Data JPA automatically creates the implementation of this interface
- * at runtime, using the method names defined below.
- */
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    // Finds a category by its exact name, ignoring uppercase/lowercase differences.
+    // Busca una categoría por nombre ignorando mayúsculas/minúsculas.
     Optional<Category> findByNameIgnoreCase(String name);
 
-    // Checks if a category name already exists before creating or updating it.
-    boolean existsByNameIgnoreCase(String name);
-
-    // Returns all active categories ordered alphabetically by name.
+    // Devuelve solo las categorías activas ordenadas por nombre.
     List<Category> findByActiveTrueOrderByNameAsc();
 
-    // Returns categories filtered by active/inactive state.
-    List<Category> findByActiveOrderByNameAsc(boolean active);
-
-    // Searches categories by partial name, useful later for filters or autocomplete.
-    List<Category> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
+    // Devuelve todas las categorías ordenadas por nombre.
+    List<Category> findAllByOrderByNameAsc();
 }
 
 /*
- * Explanation:
- * This repository centralizes all database queries related to Category.
- * It will be used later by services to list active categories, validate duplicate names,
- * search categories by text, and assign categories to products.
+ * CategoryRepository centraliza el acceso a datos de Category.
+ * Además de las operaciones CRUD heredadas de JpaRepository,
+ * añade consultas específicas para validar nombres duplicados
+ * y listar categorías activas.
  */
