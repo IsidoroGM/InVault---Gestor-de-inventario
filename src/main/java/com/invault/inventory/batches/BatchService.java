@@ -56,7 +56,6 @@ public class BatchService {
         Product product = findActiveProductById(requestDTO.getProductId());
 
         String normalizedBatchCode = normalizeBatchCode(requestDTO.getBatchCode());
-        BigDecimal normalizedQuantity = normalizeQuantity(requestDTO.getQuantity());
 
         validateBatchCodeIsUnique(normalizedBatchCode, null);
 
@@ -67,7 +66,7 @@ public class BatchService {
 
         // Normalizamos los campos principales antes de guardar.
         batch.setBatchCode(normalizedBatchCode);
-        batch.setQuantity(normalizedQuantity);
+        batch.setQuantity(BigDecimal.ZERO);
         batch.setStatus(requestDTO.getStatus());
         batch.setNotes(normalizeText(requestDTO.getNotes()));
 
@@ -80,16 +79,16 @@ public class BatchService {
         Product product = findActiveProductById(requestDTO.getProductId());
 
         String normalizedBatchCode = normalizeBatchCode(requestDTO.getBatchCode());
-        BigDecimal normalizedQuantity = normalizeQuantity(requestDTO.getQuantity());
 
         validateBatchCodeIsUnique(normalizedBatchCode, id);
 
         // Actualizamos los campos editables del lote.
         batch.setProduct(product);
         batch.setBatchCode(normalizedBatchCode);
-        batch.setQuantity(normalizedQuantity);
         batch.setStatus(requestDTO.getStatus());
         batch.setNotes(normalizeText(requestDTO.getNotes()));
+
+        // La cantidad existente se conserva. Solo StockService puede modificarla.
 
         Batch updatedBatch = batchRepository.save(batch);
         return batchMapper.toResponseDTO(updatedBatch);
@@ -137,18 +136,6 @@ public class BatchService {
         return currentBatchId == null || !existingBatch.getId().equals(currentBatchId);
     }
 
-    private BigDecimal normalizeQuantity(BigDecimal quantity) {
-        if (quantity == null) {
-            throw new BadRequestException("Batch quantity is required.");
-        }
-
-        if (quantity.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BadRequestException("Batch quantity cannot be negative.");
-        }
-
-        return quantity;
-    }
-
     private String normalizeBatchCode(String value) {
         String normalizedValue = normalizeText(value);
 
@@ -169,10 +156,9 @@ public class BatchService {
  *
  * Esta clase permite listar, consultar, crear y actualizar lotes sin exponer
  * directamente la entidad JPA Batch. También valida que el código de lote sea
- * único, que el producto relacionado exista y esté activo, y que la cantidad
- * del lote nunca sea negativa.
+ * único y que el producto relacionado exista y esté activo.
  *
- * En InVault, los lotes son una pieza clave del cálculo de stock. Product no
- * almacena stock actual directamente; el stock disponible se calculará usando
- * los lotes y, en la siguiente fase, los movimientos auditables de stock.
+ * Los lotes nuevos comienzan con cantidad cero y una actualización de sus datos
+ * nunca cambia la cantidad existente. Todo cambio de stock debe pasar por
+ * StockService para crear el StockMovement auditable correspondiente.
  */

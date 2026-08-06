@@ -62,8 +62,9 @@ public class BatchMapper {
 
         batch.setProduct(product);
         batch.setBatchCode(requestDTO.getBatchCode());
-        batch.setQuantity(requestDTO.getQuantity());
         batch.setNotes(requestDTO.getNotes());
+
+        // Quantity keeps the entity default. Stock can only change through StockService.
 
         // Status is optional in the request. If it is null, the entity keeps its default value.
         if (requestDTO.getStatus() != null) {
@@ -91,8 +92,9 @@ public class BatchMapper {
 
         batch.setProduct(product);
         batch.setBatchCode(requestDTO.getBatchCode());
-        batch.setQuantity(requestDTO.getQuantity());
         batch.setNotes(requestDTO.getNotes());
+
+        // Existing quantity is preserved. Stock can only change through StockService.
 
         // Status is only updated if the client sends a value.
         if (requestDTO.getStatus() != null) {
@@ -122,4 +124,5 @@ public class BatchMapper {
  * BatchMapper centralizes conversions between Batch, BatchRequestDTO and BatchResponseDTO.
  * It does not search Product in the database. That responsibility will belong to BatchService.
  * The mapper only receives an already loaded Product and assigns it to the Batch entity.
+ * It never maps quantity from requests because stock changes require StockService.
  */
