@@ -24,11 +24,6 @@ public class StockMovementRequestDTO {
     @NotNull(message = "Batch id is required.")
     private Long batchId;
 
-    // User responsible for the operation.
-    // Later, when JWT is implemented, this can come from the authenticated user instead.
-    @NotNull(message = "User id is required.")
-    private Long userId;
-
     // Optional supplier, mainly used for INBOUND movements.
     private Long supplierId;
 
@@ -62,14 +57,6 @@ public class StockMovementRequestDTO {
 
     public void setBatchId(Long batchId) {
         this.batchId = batchId;
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(Long userId) {
-        this.userId = userId;
     }
 
     public Long getSupplierId() {
@@ -110,4 +97,5 @@ public class StockMovementRequestDTO {
  * StockMovementRequestDTO is used as the input model for stock operations.
  * It does not include previousBatchQuantity, newBatchQuantity or movementDate because those values
  * must be calculated and assigned by StockService to preserve stock traceability.
+ * The responsible user is also excluded because it always comes from the signed JWT.
  */

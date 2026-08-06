@@ -11,11 +11,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -120,7 +123,7 @@ class RestControllerTests {
         when(supplierService.create(any(SupplierRequestDTO.class))).thenReturn(new SupplierResponseDTO());
         when(productService.create(any(ProductRequestDTO.class))).thenReturn(new ProductResponseDTO());
         when(batchService.create(any(BatchRequestDTO.class))).thenReturn(new BatchResponseDTO());
-        when(stockService.createMovement(any(StockMovementRequestDTO.class)))
+        when(stockService.createMovement(any(StockMovementRequestDTO.class), any(Long.class)))
                 .thenReturn(new StockMovementResponseDTO());
 
         performPost("/api/units", "{\"code\":\"KG\",\"name\":\"Kilogram\"}");
@@ -132,10 +135,14 @@ class RestControllerTests {
                  "locationId":2,"unitId":3,"minimumStock":5.000}
                 """);
         performPost("/api/batches", "{\"productId\":1,\"batchCode\":\"LOT-001\"}");
-        performPost("/api/stock/movements", """
-                {"productId":1,"batchId":2,"userId":3,"movementType":"INBOUND",
-                 "quantity":10.000,"reason":"Initial receipt"}
-                """);
+        mockMvc.perform(post("/api/stock/movements")
+                        .principal(jwtAuthentication(3L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productId":1,"batchId":2,"movementType":"INBOUND",
+                                 "quantity":10.000,"reason":"Initial receipt"}
+                                """))
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -202,7 +209,7 @@ class RestControllerTests {
         mockMvc.perform(post("/api/stock/movements")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"productId":1,"batchId":2,"userId":3,
+                                {"productId":1,"batchId":2,
                                  "movementType":"INBOUND","quantity":0}
                                 """))
                 .andExpect(status().isBadRequest())
@@ -239,6 +246,19 @@ class RestControllerTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(content))
                 .andExpect(status().isOk());
+    }
+
+    private JwtAuthenticationToken jwtAuthentication(Long userId) {
+        Instant now = Instant.now();
+        Jwt jwt = Jwt.withTokenValue("controller-test-token")
+                .header("alg", "HS256")
+                .subject("controller-test-user")
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(300))
+                .claim("userId", userId)
+                .build();
+
+        return new JwtAuthenticationToken(jwt);
     }
 }
 
