@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +14,8 @@ import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
+import com.invault.inventory.realtime.InventoryEventDTO;
+import com.invault.inventory.realtime.StockMovementRecordedEvent;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.suppliers.Supplier;
@@ -30,6 +33,7 @@ public class StockService {
     private final UserRepository userRepository;
     private final SupplierRepository supplierRepository;
     private final StockMovementMapper stockMovementMapper;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public StockService(
             StockMovementRepository stockMovementRepository,
@@ -37,7 +41,8 @@ public class StockService {
             BatchRepository batchRepository,
             UserRepository userRepository,
             SupplierRepository supplierRepository,
-            StockMovementMapper stockMovementMapper) {
+            StockMovementMapper stockMovementMapper,
+            ApplicationEventPublisher applicationEventPublisher) {
 
         this.stockMovementRepository = stockMovementRepository;
         this.productRepository = productRepository;
@@ -45,6 +50,7 @@ public class StockService {
         this.userRepository = userRepository;
         this.supplierRepository = supplierRepository;
         this.stockMovementMapper = stockMovementMapper;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -128,7 +134,13 @@ public class StockService {
         );
 
         StockMovement savedMovement = stockMovementRepository.save(stockMovement);
-        return stockMovementMapper.toResponseDTO(savedMovement);
+        StockMovementResponseDTO responseDTO = stockMovementMapper.toResponseDTO(savedMovement);
+
+        applicationEventPublisher.publishEvent(
+                new StockMovementRecordedEvent(InventoryEventDTO.stockUpdated(responseDTO))
+        );
+
+        return responseDTO;
     }
 
     private StockMovement findStockMovementEntityById(Long id) {
@@ -285,6 +297,8 @@ public class StockService {
  * En InVault el stock no se modifica directamente desde Product. El stock se
  * controla mediante lotes y movimientos auditables, lo que permite reconstruir
  * el historial de cambios del inventario.
+ * Cada movimiento publica un evento interno cuyo envio WebSocket se ejecuta solo
+ * despues de confirmar correctamente la transaccion.
  * El usuario responsable procede siempre del JWT autenticado y nunca del cuerpo
  * enviado por el cliente.
  */
