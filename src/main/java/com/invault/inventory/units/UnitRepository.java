@@ -6,40 +6,24 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository responsible for database operations related to Unit entities.
- *
- * Spring Data JPA will automatically create the implementation at runtime
- * based on the method names defined in this interface.
- */
 @Repository
 public interface UnitRepository extends JpaRepository<Unit, Long> {
 
-    // Finds a unit by its technical code, for example: "KG", "PCS", "L".
+    // Busca una unidad por código ignorando mayúsculas/minúsculas.
     Optional<Unit> findByCodeIgnoreCase(String code);
 
-    // Checks if a unit code already exists before creating or updating a unit.
-    boolean existsByCodeIgnoreCase(String code);
-
-    // Finds a unit by its name, ignoring uppercase/lowercase differences.
+    // Busca una unidad por nombre ignorando mayúsculas/minúsculas.
     Optional<Unit> findByNameIgnoreCase(String name);
 
-    // Checks if a unit name already exists.
-    boolean existsByNameIgnoreCase(String name);
-
-    // Returns all active units ordered alphabetically by name.
+    // Devuelve solo las unidades activas ordenadas por nombre.
     List<Unit> findByActiveTrueOrderByNameAsc();
 
-    // Returns units filtered by active/inactive state.
-    List<Unit> findByActiveOrderByNameAsc(boolean active);
-
-    // Searches units by partial name, useful later for filters or autocomplete.
-    List<Unit> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
+    // Devuelve todas las unidades ordenadas por nombre.
+    List<Unit> findAllByOrderByNameAsc();
 }
 
 /*
- * Explanation:
- * This repository gives the application a clean way to query Unit records
- * without writing SQL manually. It will be used later by services when creating
- * products, validating units, listing active units, or preventing duplicate unit codes.
+ * UnitRepository centraliza el acceso a datos de Unit.
+ * Además de las operaciones CRUD heredadas de JpaRepository,
+ * añade consultas específicas para validar duplicados y listar unidades activas.
  */

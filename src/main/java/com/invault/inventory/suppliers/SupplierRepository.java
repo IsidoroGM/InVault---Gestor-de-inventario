@@ -1,48 +1,30 @@
 package com.invault.inventory.suppliers;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Repository responsible for database operations related to Supplier entities.
- *
- * Spring Data JPA automatically creates the implementation of this interface
- * at runtime, using the method names defined below.
- */
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
 @Repository
 public interface SupplierRepository extends JpaRepository<Supplier, Long> {
 
-    // Finds a supplier by its exact name, ignoring uppercase/lowercase differences.
+    // Busca un proveedor por nombre ignorando mayúsculas/minúsculas.
     Optional<Supplier> findByNameIgnoreCase(String name);
 
-    // Checks if a supplier name already exists before creating or updating it.
-    boolean existsByNameIgnoreCase(String name);
-
-    // Finds a supplier by email, ignoring uppercase/lowercase differences.
+    // Busca un proveedor por email ignorando mayúsculas/minúsculas.
     Optional<Supplier> findByEmailIgnoreCase(String email);
 
-    // Checks if a supplier email already exists before creating or updating it.
-    boolean existsByEmailIgnoreCase(String email);
-
-    // Returns all active suppliers ordered alphabetically by name.
+    // Devuelve solo los proveedores activos ordenados por nombre.
     List<Supplier> findByActiveTrueOrderByNameAsc();
 
-    // Returns suppliers filtered by active/inactive state.
-    List<Supplier> findByActiveOrderByNameAsc(boolean active);
-
-    // Searches suppliers by partial name, useful later for filters or autocomplete.
-    List<Supplier> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
-
-    // Searches suppliers by partial email, useful later for administration filters.
-    List<Supplier> findByEmailContainingIgnoreCaseOrderByNameAsc(String email);
+    // Devuelve todos los proveedores ordenados por nombre.
+    List<Supplier> findAllByOrderByNameAsc();
 }
 
 /*
- * Explanation:
- * This repository centralizes all database queries related to Supplier.
- * It will be used later by services to list active suppliers, validate duplicate names or emails,
- * search suppliers by text, and associate suppliers with inbound stock movements.
+ * SupplierRepository centraliza el acceso a datos de Supplier.
+ * Además de las operaciones CRUD heredadas de JpaRepository,
+ * añade consultas específicas para validar proveedores duplicados
+ * y listar proveedores activos.
  */

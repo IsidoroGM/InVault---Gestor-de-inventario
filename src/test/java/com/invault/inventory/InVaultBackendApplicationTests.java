@@ -2,12 +2,14 @@ package com.invault.inventory;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 /**
  * Basic Spring Boot context test.
  * It checks that the application can start correctly during automated tests.
  */
 @SpringBootTest
+@ActiveProfiles("test")
 class InVaultBackendApplicationTests {
 
     @Test
