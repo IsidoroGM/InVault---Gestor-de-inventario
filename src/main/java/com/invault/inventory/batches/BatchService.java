@@ -67,6 +67,7 @@ public class BatchService {
         // Normalizamos los campos principales antes de guardar.
         batch.setBatchCode(normalizedBatchCode);
         batch.setQuantity(BigDecimal.ZERO);
+        validateNewBatchStatus(requestDTO.getStatus());
         batch.setStatus(requestDTO.getStatus());
         batch.setNotes(normalizeText(requestDTO.getNotes()));
 
@@ -75,7 +76,7 @@ public class BatchService {
     }
 
     public BatchResponseDTO update(Long id, BatchRequestDTO requestDTO) {
-        Batch batch = findBatchEntityById(id);
+        Batch batch = findBatchEntityForUpdate(id);
         Product product = findActiveProductById(requestDTO.getProductId());
 
         String normalizedBatchCode = normalizeBatchCode(requestDTO.getBatchCode());
@@ -89,6 +90,7 @@ public class BatchService {
 
         // Un estado omitido conserva el valor actual y evita reactivar el lote.
         if (requestDTO.getStatus() != null) {
+            validateStatusTransition(batch, requestDTO.getStatus());
             batch.setStatus(requestDTO.getStatus());
         }
 
@@ -100,6 +102,11 @@ public class BatchService {
 
     private Batch findBatchEntityById(Long id) {
         return batchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + id));
+    }
+
+    private Batch findBatchEntityForUpdate(Long id) {
+        return batchRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + id));
     }
 
@@ -138,6 +145,45 @@ public class BatchService {
 
     private boolean isDifferentBatch(Batch existingBatch, Long currentBatchId) {
         return currentBatchId == null || !existingBatch.getId().equals(currentBatchId);
+    }
+
+    private void validateStatusTransition(Batch batch, BatchStatus requestedStatus) {
+        BatchStatus currentStatus = batch.getStatus();
+        if (currentStatus == requestedStatus) {
+            return;
+        }
+
+        if (requestedStatus == BatchStatus.CONSUMED) {
+            throw new BadRequestException(
+                    "A batch becomes consumed only when a stock movement reduces its quantity to zero.");
+        }
+
+        if (currentStatus == BatchStatus.CONSUMED && requestedStatus == BatchStatus.AVAILABLE) {
+            throw new BadRequestException(
+                    "A consumed batch becomes available only through an inbound or positive adjustment movement.");
+        }
+
+        boolean allowed = switch (currentStatus) {
+            case AVAILABLE -> requestedStatus == BatchStatus.BLOCKED
+                    || requestedStatus == BatchStatus.INACTIVE;
+            case BLOCKED -> requestedStatus == BatchStatus.AVAILABLE
+                    || requestedStatus == BatchStatus.INACTIVE;
+            case CONSUMED -> requestedStatus == BatchStatus.INACTIVE;
+            case INACTIVE -> requestedStatus == BatchStatus.AVAILABLE
+                    || requestedStatus == BatchStatus.BLOCKED;
+        };
+
+        if (!allowed) {
+            throw new BadRequestException(
+                    "Batch status transition from " + currentStatus + " to " + requestedStatus + " is not allowed.");
+        }
+    }
+
+    private void validateNewBatchStatus(BatchStatus requestedStatus) {
+        if (requestedStatus == BatchStatus.CONSUMED) {
+            throw new BadRequestException(
+                    "A new batch cannot start as consumed because it has no stock movement history.");
+        }
     }
 
     private String normalizeBatchCode(String value) {

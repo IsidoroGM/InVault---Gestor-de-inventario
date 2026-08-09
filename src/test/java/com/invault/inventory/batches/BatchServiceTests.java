@@ -2,6 +2,7 @@ package com.invault.inventory.batches;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.invault.inventory.batches.dto.BatchRequestDTO;
 import com.invault.inventory.batches.dto.BatchResponseDTO;
+import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
 
@@ -63,7 +65,7 @@ class BatchServiceTests {
         batch.setQuantity(new BigDecimal("18.500"));
         BatchResponseDTO responseDTO = new BatchResponseDTO();
 
-        when(batchRepository.findById(7L)).thenReturn(Optional.of(batch));
+        when(batchRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(batch));
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(batchRepository.findByBatchCodeIgnoreCase("LOT-001")).thenReturn(Optional.empty());
         when(batchRepository.save(batch)).thenReturn(batch);
@@ -86,7 +88,7 @@ class BatchServiceTests {
         batch.setStatus(BatchStatus.BLOCKED);
         BatchResponseDTO responseDTO = new BatchResponseDTO();
 
-        when(batchRepository.findById(7L)).thenReturn(Optional.of(batch));
+        when(batchRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(batch));
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(batchRepository.findByBatchCodeIgnoreCase("LOT-001")).thenReturn(Optional.empty());
         when(batchRepository.save(batch)).thenReturn(batch);
@@ -97,6 +99,95 @@ class BatchServiceTests {
         assertSame(responseDTO, result);
         assertEquals(BatchStatus.BLOCKED, batch.getStatus());
         verify(batchRepository).save(batch);
+    }
+
+    @Test
+    void createCannotStartBatchAsConsumed() {
+        BatchRequestDTO requestDTO = createRequestDTO();
+        requestDTO.setStatus(BatchStatus.CONSUMED);
+        Product product = new Product();
+        Batch batch = new Batch();
+
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(batchRepository.findByBatchCodeIgnoreCase("LOT-001")).thenReturn(Optional.empty());
+        when(batchMapper.toEntity(requestDTO, product)).thenReturn(batch);
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> batchService.create(requestDTO)
+        );
+
+        assertEquals(
+                "A new batch cannot start as consumed because it has no stock movement history.",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void updateCannotMarkBatchAsConsumedWithoutStockMovement() {
+        BatchRequestDTO requestDTO = createRequestDTO();
+        requestDTO.setStatus(BatchStatus.CONSUMED);
+        Product product = new Product();
+        Batch batch = new Batch();
+        batch.setQuantity(new BigDecimal("4.000"));
+        batch.setStatus(BatchStatus.AVAILABLE);
+
+        when(batchRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(batch));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(batchRepository.findByBatchCodeIgnoreCase("LOT-001")).thenReturn(Optional.empty());
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> batchService.update(7L, requestDTO)
+        );
+
+        assertEquals(
+                "A batch becomes consumed only when a stock movement reduces its quantity to zero.",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void updateCannotReactivateConsumedBatchWithoutPositiveMovement() {
+        BatchRequestDTO requestDTO = createRequestDTO();
+        requestDTO.setStatus(BatchStatus.AVAILABLE);
+        Product product = new Product();
+        Batch batch = new Batch();
+        batch.setQuantity(BigDecimal.ZERO);
+        batch.setStatus(BatchStatus.CONSUMED);
+
+        when(batchRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(batch));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(batchRepository.findByBatchCodeIgnoreCase("LOT-001")).thenReturn(Optional.empty());
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> batchService.update(7L, requestDTO)
+        );
+
+        assertEquals(
+                "A consumed batch becomes available only through an inbound or positive adjustment movement.",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void updateAllowsBlockedBatchToBecomeAvailable() {
+        BatchRequestDTO requestDTO = createRequestDTO();
+        requestDTO.setStatus(BatchStatus.AVAILABLE);
+        Product product = new Product();
+        Batch batch = new Batch();
+        batch.setStatus(BatchStatus.BLOCKED);
+        BatchResponseDTO responseDTO = new BatchResponseDTO();
+
+        when(batchRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(batch));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(batchRepository.findByBatchCodeIgnoreCase("LOT-001")).thenReturn(Optional.empty());
+        when(batchRepository.save(batch)).thenReturn(batch);
+        when(batchMapper.toResponseDTO(batch)).thenReturn(responseDTO);
+
+        assertSame(responseDTO, batchService.update(7L, requestDTO));
+        assertEquals(BatchStatus.AVAILABLE, batch.getStatus());
     }
 
     private BatchRequestDTO createRequestDTO() {

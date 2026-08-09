@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.invault.inventory.batches.Batch;
 import com.invault.inventory.batches.BatchRepository;
+import com.invault.inventory.batches.BatchStatus;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.common.dto.PageResponseDTO;
@@ -126,15 +127,16 @@ public class StockService {
             Long authenticatedUserId) {
 
         Product product = findActiveProductById(requestDTO.getProductId());
-        Batch batch = findBatchEntityById(requestDTO.getBatchId());
-        User user = findUserEntityById(authenticatedUserId);
-        Supplier supplier = findOptionalSupplierById(requestDTO.getSupplierId());
+        Batch batch = findBatchEntityForUpdate(requestDTO.getBatchId());
 
         validateBatchBelongsToProduct(batch, product);
 
         MovementType movementType = requestDTO.getMovementType();
+        validateMovementAllowedForBatchStatus(batch, movementType);
         BigDecimal movementQuantity = normalizeMovementQuantity(requestDTO.getQuantity());
         BigDecimal previousBatchQuantity = normalizeCurrentBatchQuantity(batch.getQuantity());
+        User user = findUserEntityById(authenticatedUserId);
+        Supplier supplier = findOptionalSupplierById(requestDTO.getSupplierId());
 
         BigDecimal newBatchQuantity = calculateNewBatchQuantity(
                 movementType,
@@ -146,6 +148,7 @@ public class StockService {
 
         // Actualizamos la cantidad del lote. Product no almacena stock actual.
         batch.setQuantity(newBatchQuantity);
+        updateBatchStatusAfterMovement(batch, newBatchQuantity);
         batchRepository.save(batch);
 
         /*
@@ -194,12 +197,12 @@ public class StockService {
         return product;
     }
 
-    private Batch findBatchEntityById(Long batchId) {
+    private Batch findBatchEntityForUpdate(Long batchId) {
         if (batchId == null) {
             throw new BadRequestException("Batch id is required.");
         }
 
-        return batchRepository.findById(batchId)
+        return batchRepository.findByIdForUpdate(batchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + batchId));
     }
 
@@ -271,6 +274,43 @@ public class StockService {
         }
 
         return quantity;
+    }
+
+    private void validateMovementAllowedForBatchStatus(Batch batch, MovementType movementType) {
+        if (movementType == null) {
+            throw new BadRequestException("Movement type is required.");
+        }
+
+        BatchStatus status = batch.getStatus();
+        if (status == null) {
+            throw new BadRequestException("Batch status is required for stock movements.");
+        }
+
+        switch (status) {
+            case AVAILABLE -> {
+                // All movement types are valid while the batch is operational.
+            }
+            case CONSUMED -> {
+                if (movementType != MovementType.INBOUND
+                        && movementType != MovementType.POSITIVE_ADJUSTMENT) {
+                    throw new BadRequestException(
+                            "Consumed batches only accept inbound or positive adjustment movements.");
+                }
+            }
+            case BLOCKED -> throw new BadRequestException("Blocked batches do not accept stock movements.");
+            case INACTIVE -> throw new BadRequestException("Inactive batches do not accept stock movements.");
+        }
+    }
+
+    private void updateBatchStatusAfterMovement(Batch batch, BigDecimal newBatchQuantity) {
+        if (newBatchQuantity.compareTo(BigDecimal.ZERO) == 0) {
+            batch.setStatus(BatchStatus.CONSUMED);
+            return;
+        }
+
+        if (BatchStatus.CONSUMED.equals(batch.getStatus())) {
+            batch.setStatus(BatchStatus.AVAILABLE);
+        }
     }
 
     private BigDecimal normalizeCurrentBatchQuantity(BigDecimal batchQuantity) {

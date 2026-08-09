@@ -3,7 +3,10 @@ package com.invault.inventory.batches;
 import java.util.List;
 import java.util.Optional;
 
+import jakarta.persistence.LockModeType;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -19,6 +22,10 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
 
     // Devuelve los lotes de un producto concreto ordenados por código.
     List<Batch> findByProductIdOrderByBatchCodeAsc(Long productId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select batch from Batch batch where batch.id = :batchId")
+    Optional<Batch> findByIdForUpdate(@Param("batchId") Long batchId);
 
     long countByStatus(BatchStatus status);
 
