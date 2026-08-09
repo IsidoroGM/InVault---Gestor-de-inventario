@@ -6,6 +6,8 @@ import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.suppliers.dto.SupplierRequestDTO;
@@ -17,10 +19,15 @@ public class SupplierService {
 
     private final SupplierRepository supplierRepository;
     private final SupplierMapper supplierMapper;
+    private final AuditService auditService;
 
-    public SupplierService(SupplierRepository supplierRepository, SupplierMapper supplierMapper) {
+    public SupplierService(
+            SupplierRepository supplierRepository,
+            SupplierMapper supplierMapper,
+            AuditService auditService) {
         this.supplierRepository = supplierRepository;
         this.supplierMapper = supplierMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -62,11 +69,15 @@ public class SupplierService {
         }
 
         Supplier savedSupplier = supplierRepository.save(supplier);
-        return supplierMapper.toResponseDTO(savedSupplier);
+        SupplierResponseDTO response = supplierMapper.toResponseDTO(savedSupplier);
+        auditService.registerMutation(
+                AuditAction.CREATED, "Supplier", response.getId(), "Supplier created.", null, response);
+        return response;
     }
 
     public SupplierResponseDTO update(Long id, SupplierRequestDTO requestDTO) {
         Supplier supplier = findSupplierEntityById(id);
+        SupplierResponseDTO before = supplierMapper.toResponseDTO(supplier);
 
         String normalizedName = normalizeText(requestDTO.getName());
         String normalizedEmail = normalizeEmail(requestDTO.getEmail());
@@ -86,11 +97,16 @@ public class SupplierService {
         }
 
         Supplier updatedSupplier = supplierRepository.save(supplier);
-        return supplierMapper.toResponseDTO(updatedSupplier);
+        SupplierResponseDTO after = supplierMapper.toResponseDTO(updatedSupplier);
+        auditService.registerMutation(
+                AuditAction.fromActiveChange(before.isActive(), after.isActive()),
+                "Supplier", after.getId(), "Supplier updated.", before, after);
+        return after;
     }
 
     public void deactivate(Long id) {
         Supplier supplier = findSupplierEntityById(id);
+        SupplierResponseDTO before = supplierMapper.toResponseDTO(supplier);
 
         if (Boolean.FALSE.equals(supplier.getActive())) {
             throw new BadRequestException("Supplier is already inactive.");
@@ -98,6 +114,9 @@ public class SupplierService {
 
         supplier.setActive(false);
         supplierRepository.save(supplier);
+        SupplierResponseDTO after = supplierMapper.toResponseDTO(supplier);
+        auditService.registerMutation(
+                AuditAction.DEACTIVATED, "Supplier", id, "Supplier deactivated.", before, after);
     }
 
     private Supplier findSupplierEntityById(Long id) {

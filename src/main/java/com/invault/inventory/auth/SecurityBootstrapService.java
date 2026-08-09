@@ -61,11 +61,11 @@ public class SecurityBootstrapService {
         }
 
         // The bootstrap is idempotent and never resets an existing account password.
-        if (userRepository.existsByUsername(username)) {
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
             return;
         }
 
-        if (userRepository.existsByEmail(email)) {
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new IllegalStateException("Bootstrap admin email is already assigned to another user.");
         }
 

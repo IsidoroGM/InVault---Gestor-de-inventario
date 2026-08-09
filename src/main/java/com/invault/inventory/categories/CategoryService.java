@@ -6,6 +6,8 @@ import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.categories.dto.CategoryRequestDTO;
 import com.invault.inventory.categories.dto.CategoryResponseDTO;
 import com.invault.inventory.common.exception.BadRequestException;
@@ -17,10 +19,15 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final CategoryMapper categoryMapper;
+    private final AuditService auditService;
 
-    public CategoryService(CategoryRepository categoryRepository, CategoryMapper categoryMapper) {
+    public CategoryService(
+            CategoryRepository categoryRepository,
+            CategoryMapper categoryMapper,
+            AuditService auditService) {
         this.categoryRepository = categoryRepository;
         this.categoryMapper = categoryMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -57,11 +64,15 @@ public class CategoryService {
         }
 
         Category savedCategory = categoryRepository.save(category);
-        return categoryMapper.toResponseDTO(savedCategory);
+        CategoryResponseDTO response = categoryMapper.toResponseDTO(savedCategory);
+        auditService.registerMutation(
+                AuditAction.CREATED, "Category", response.getId(), "Category created.", null, response);
+        return response;
     }
 
     public CategoryResponseDTO update(Long id, CategoryRequestDTO requestDTO) {
         Category category = findCategoryEntityById(id);
+        CategoryResponseDTO before = categoryMapper.toResponseDTO(category);
 
         String normalizedName = normalizeName(requestDTO.getName());
 
@@ -76,11 +87,16 @@ public class CategoryService {
         }
 
         Category updatedCategory = categoryRepository.save(category);
-        return categoryMapper.toResponseDTO(updatedCategory);
+        CategoryResponseDTO after = categoryMapper.toResponseDTO(updatedCategory);
+        auditService.registerMutation(
+                AuditAction.fromActiveChange(before.isActive(), after.isActive()),
+                "Category", after.getId(), "Category updated.", before, after);
+        return after;
     }
 
     public void deactivate(Long id) {
         Category category = findCategoryEntityById(id);
+        CategoryResponseDTO before = categoryMapper.toResponseDTO(category);
 
         if (Boolean.FALSE.equals(category.getActive())) {
             throw new BadRequestException("Category is already inactive.");
@@ -88,6 +104,9 @@ public class CategoryService {
 
         category.setActive(false);
         categoryRepository.save(category);
+        CategoryResponseDTO after = categoryMapper.toResponseDTO(category);
+        auditService.registerMutation(
+                AuditAction.DEACTIVATED, "Category", id, "Category deactivated.", before, after);
     }
 
     private Category findCategoryEntityById(Long id) {

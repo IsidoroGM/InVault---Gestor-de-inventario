@@ -7,6 +7,8 @@ import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.batches.dto.BatchRequestDTO;
 import com.invault.inventory.batches.dto.BatchResponseDTO;
 import com.invault.inventory.common.exception.BadRequestException;
@@ -21,15 +23,18 @@ public class BatchService {
     private final BatchRepository batchRepository;
     private final ProductRepository productRepository;
     private final BatchMapper batchMapper;
+    private final AuditService auditService;
 
     public BatchService(
             BatchRepository batchRepository,
             ProductRepository productRepository,
-            BatchMapper batchMapper) {
+            BatchMapper batchMapper,
+            AuditService auditService) {
 
         this.batchRepository = batchRepository;
         this.productRepository = productRepository;
         this.batchMapper = batchMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -67,15 +72,20 @@ public class BatchService {
         // Normalizamos los campos principales antes de guardar.
         batch.setBatchCode(normalizedBatchCode);
         batch.setQuantity(BigDecimal.ZERO);
+        validateNewBatchStatus(requestDTO.getStatus());
         batch.setStatus(requestDTO.getStatus());
         batch.setNotes(normalizeText(requestDTO.getNotes()));
 
         Batch savedBatch = batchRepository.save(batch);
-        return batchMapper.toResponseDTO(savedBatch);
+        BatchResponseDTO response = batchMapper.toResponseDTO(savedBatch);
+        auditService.registerMutation(
+                AuditAction.CREATED, "Batch", response.getId(), "Batch created.", null, response);
+        return response;
     }
 
     public BatchResponseDTO update(Long id, BatchRequestDTO requestDTO) {
-        Batch batch = findBatchEntityById(id);
+        Batch batch = findBatchEntityForUpdate(id);
+        BatchResponseDTO before = batchMapper.toResponseDTO(batch);
         Product product = findActiveProductById(requestDTO.getProductId());
 
         String normalizedBatchCode = normalizeBatchCode(requestDTO.getBatchCode());
@@ -89,17 +99,26 @@ public class BatchService {
 
         // Un estado omitido conserva el valor actual y evita reactivar el lote.
         if (requestDTO.getStatus() != null) {
+            validateStatusTransition(batch, requestDTO.getStatus());
             batch.setStatus(requestDTO.getStatus());
         }
 
         // La cantidad existente se conserva. Solo StockService puede modificarla.
 
         Batch updatedBatch = batchRepository.save(batch);
-        return batchMapper.toResponseDTO(updatedBatch);
+        BatchResponseDTO after = batchMapper.toResponseDTO(updatedBatch);
+        auditService.registerMutation(
+                AuditAction.UPDATED, "Batch", after.getId(), "Batch updated.", before, after);
+        return after;
     }
 
     private Batch findBatchEntityById(Long id) {
         return batchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + id));
+    }
+
+    private Batch findBatchEntityForUpdate(Long id) {
+        return batchRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + id));
     }
 
@@ -138,6 +157,45 @@ public class BatchService {
 
     private boolean isDifferentBatch(Batch existingBatch, Long currentBatchId) {
         return currentBatchId == null || !existingBatch.getId().equals(currentBatchId);
+    }
+
+    private void validateStatusTransition(Batch batch, BatchStatus requestedStatus) {
+        BatchStatus currentStatus = batch.getStatus();
+        if (currentStatus == requestedStatus) {
+            return;
+        }
+
+        if (requestedStatus == BatchStatus.CONSUMED) {
+            throw new BadRequestException(
+                    "A batch becomes consumed only when a stock movement reduces its quantity to zero.");
+        }
+
+        if (currentStatus == BatchStatus.CONSUMED && requestedStatus == BatchStatus.AVAILABLE) {
+            throw new BadRequestException(
+                    "A consumed batch becomes available only through an inbound or positive adjustment movement.");
+        }
+
+        boolean allowed = switch (currentStatus) {
+            case AVAILABLE -> requestedStatus == BatchStatus.BLOCKED
+                    || requestedStatus == BatchStatus.INACTIVE;
+            case BLOCKED -> requestedStatus == BatchStatus.AVAILABLE
+                    || requestedStatus == BatchStatus.INACTIVE;
+            case CONSUMED -> requestedStatus == BatchStatus.INACTIVE;
+            case INACTIVE -> requestedStatus == BatchStatus.AVAILABLE
+                    || requestedStatus == BatchStatus.BLOCKED;
+        };
+
+        if (!allowed) {
+            throw new BadRequestException(
+                    "Batch status transition from " + currentStatus + " to " + requestedStatus + " is not allowed.");
+        }
+    }
+
+    private void validateNewBatchStatus(BatchStatus requestedStatus) {
+        if (requestedStatus == BatchStatus.CONSUMED) {
+            throw new BadRequestException(
+                    "A new batch cannot start as consumed because it has no stock movement history.");
+        }
     }
 
     private String normalizeBatchCode(String value) {

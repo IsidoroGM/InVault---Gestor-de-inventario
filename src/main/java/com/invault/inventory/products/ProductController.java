@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.products.dto.ProductRequestDTO;
 import com.invault.inventory.products.dto.ProductResponseDTO;
 
@@ -41,6 +43,16 @@ public class ProductController {
     @GetMapping("/{id}")
     public ProductResponseDTO findById(@PathVariable Long id) {
         return productService.findById(id);
+    }
+
+    @GetMapping("/search")
+    public PageResponseDTO<ProductResponseDTO> search(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+
+        return productService.search(query, active, page, size);
     }
 
     @PostMapping

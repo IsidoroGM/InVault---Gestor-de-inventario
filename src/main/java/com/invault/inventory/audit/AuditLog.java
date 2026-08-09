@@ -85,6 +85,12 @@ public class AuditLog {
     @Column(length = 500)
     private String details;
 
+    @Column(name = "before_data", length = 4000)
+    private String beforeData;
+
+    @Column(name = "after_data", length = 4000)
+    private String afterData;
+
     /*
      * Optional client IP address.
      *
@@ -109,11 +115,26 @@ public class AuditLog {
             String details,
             String clientIp
     ) {
+        this(user, action, entityName, entityId, details, null, null, clientIp);
+    }
+
+    public AuditLog(
+            User user,
+            AuditAction action,
+            String entityName,
+            Long entityId,
+            String details,
+            String beforeData,
+            String afterData,
+            String clientIp
+    ) {
         this.user = user;
         this.action = action;
         this.entityName = normalizeEntityName(entityName);
         this.entityId = entityId;
         this.details = normalizeText(details);
+        this.beforeData = normalizeText(beforeData);
+        this.afterData = normalizeText(afterData);
         this.clientIp = normalizeText(clientIp);
     }
 
@@ -124,6 +145,8 @@ public class AuditLog {
         // Keeps audit data clean before inserting into the database.
         this.entityName = normalizeEntityName(this.entityName);
         this.details = normalizeText(this.details);
+        this.beforeData = normalizeText(this.beforeData);
+        this.afterData = normalizeText(this.afterData);
         this.clientIp = normalizeText(this.clientIp);
 
         validateAuditData();
@@ -184,6 +207,14 @@ public class AuditLog {
 
     public String getDetails() {
         return details;
+    }
+
+    public String getBeforeData() {
+        return beforeData;
+    }
+
+    public String getAfterData() {
+        return afterData;
     }
 
     public String getClientIp() {

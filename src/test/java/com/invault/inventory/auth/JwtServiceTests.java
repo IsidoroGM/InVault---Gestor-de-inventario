@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.invault.inventory.config.JwtConfig;
@@ -36,7 +37,10 @@ class JwtServiceTests {
         JwtConfig jwtConfig = new JwtConfig();
         SecretKey secretKey = jwtConfig.jwtSecretKey(properties);
         JwtEncoder encoder = jwtConfig.jwtEncoder(secretKey);
-        JwtDecoder decoder = jwtConfig.jwtDecoder(secretKey, properties);
+        UserSessionTokenValidator sessionValidator = org.mockito.Mockito.mock(UserSessionTokenValidator.class);
+        org.mockito.Mockito.when(sessionValidator.validate(org.mockito.ArgumentMatchers.any(Jwt.class)))
+                .thenReturn(OAuth2TokenValidatorResult.success());
+        JwtDecoder decoder = jwtConfig.jwtDecoder(secretKey, properties, sessionValidator);
         JwtService jwtService = new JwtService(encoder, properties);
 
         User user = new User("warehouse.user", "warehouse@example.com", "hash");
@@ -56,6 +60,7 @@ class JwtServiceTests {
         assertEquals(Long.valueOf(17L), decodedToken.getClaim("userId"));
         assertEquals(java.util.List.of("READ_ONLY", "WAREHOUSE"), decodedToken.getClaimAsStringList("roles"));
         assertEquals(Boolean.TRUE, decodedToken.getClaim("mustChangePassword"));
+        assertEquals(Long.valueOf(0L), decodedToken.getClaim("tokenVersion"));
         assertEquals(300, tokenDetails.expiresInSeconds());
         assertTrue(tokenDetails.expiresAt().isAfter(beforeGeneration));
         assertFalse(tokenDetails.token().isBlank());

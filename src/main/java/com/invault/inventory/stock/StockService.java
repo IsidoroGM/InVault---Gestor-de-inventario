@@ -1,18 +1,29 @@
 package com.invault.inventory.stock;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.batches.Batch;
 import com.invault.inventory.batches.BatchRepository;
+import com.invault.inventory.batches.BatchStatus;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
+import com.invault.inventory.realtime.InventoryEventDTO;
+import com.invault.inventory.realtime.StockMovementRecordedEvent;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.suppliers.Supplier;
@@ -30,6 +41,8 @@ public class StockService {
     private final UserRepository userRepository;
     private final SupplierRepository supplierRepository;
     private final StockMovementMapper stockMovementMapper;
+    private final ApplicationEventPublisher applicationEventPublisher;
+    private final AuditService auditService;
 
     public StockService(
             StockMovementRepository stockMovementRepository,
@@ -37,7 +50,9 @@ public class StockService {
             BatchRepository batchRepository,
             UserRepository userRepository,
             SupplierRepository supplierRepository,
-            StockMovementMapper stockMovementMapper) {
+            StockMovementMapper stockMovementMapper,
+            ApplicationEventPublisher applicationEventPublisher,
+            AuditService auditService) {
 
         this.stockMovementRepository = stockMovementRepository;
         this.productRepository = productRepository;
@@ -45,6 +60,8 @@ public class StockService {
         this.userRepository = userRepository;
         this.supplierRepository = supplierRepository;
         this.stockMovementMapper = stockMovementMapper;
+        this.applicationEventPublisher = applicationEventPublisher;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -84,20 +101,48 @@ public class StockService {
         return stockMovementMapper.toResponseDTO(stockMovement);
     }
 
+    @Transactional(readOnly = true)
+    public PageResponseDTO<StockMovementResponseDTO> search(
+            Long productId,
+            Long batchId,
+            MovementType movementType,
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            int page,
+            int size) {
+
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+            throw new BadRequestException("Movement start date cannot be after end date.");
+        }
+        PageRequest pageable = pageRequest(page, size);
+        Page<StockMovementResponseDTO> result = stockMovementRepository.search(
+                productId,
+                batchId,
+                movementType,
+                fromDate,
+                toDate,
+                pageable
+        ).map(stockMovementMapper::toResponseDTO);
+
+        return PageResponseDTO.from(result);
+    }
+
     public StockMovementResponseDTO createMovement(
             StockMovementRequestDTO requestDTO,
             Long authenticatedUserId) {
 
         Product product = findActiveProductById(requestDTO.getProductId());
-        Batch batch = findBatchEntityById(requestDTO.getBatchId());
-        User user = findUserEntityById(authenticatedUserId);
-        Supplier supplier = findOptionalSupplierById(requestDTO.getSupplierId());
+        Batch batch = findBatchEntityForUpdate(requestDTO.getBatchId());
 
         validateBatchBelongsToProduct(batch, product);
 
         MovementType movementType = requestDTO.getMovementType();
+        validateMovementAllowedForBatchStatus(batch, movementType);
         BigDecimal movementQuantity = normalizeMovementQuantity(requestDTO.getQuantity());
         BigDecimal previousBatchQuantity = normalizeCurrentBatchQuantity(batch.getQuantity());
+        BatchStatus previousBatchStatus = batch.getStatus();
+        User user = findUserEntityById(authenticatedUserId);
+        Supplier supplier = findOptionalSupplierById(requestDTO.getSupplierId());
 
         BigDecimal newBatchQuantity = calculateNewBatchQuantity(
                 movementType,
@@ -109,6 +154,7 @@ public class StockService {
 
         // Actualizamos la cantidad del lote. Product no almacena stock actual.
         batch.setQuantity(newBatchQuantity);
+        updateBatchStatusAfterMovement(batch, newBatchQuantity);
         batchRepository.save(batch);
 
         /*
@@ -128,7 +174,22 @@ public class StockService {
         );
 
         StockMovement savedMovement = stockMovementRepository.save(stockMovement);
-        return stockMovementMapper.toResponseDTO(savedMovement);
+        StockMovementResponseDTO responseDTO = stockMovementMapper.toResponseDTO(savedMovement);
+
+        auditService.registerMutation(
+                AuditAction.STOCK_MOVEMENT_CREATED,
+                "StockMovement",
+                savedMovement.getId(),
+                "Stock movement created.",
+                new BatchStockAuditSnapshot(batch.getId(), previousBatchQuantity, previousBatchStatus),
+                new BatchStockAuditSnapshot(batch.getId(), newBatchQuantity, batch.getStatus())
+        );
+
+        applicationEventPublisher.publishEvent(
+                new StockMovementRecordedEvent(InventoryEventDTO.stockUpdated(responseDTO))
+        );
+
+        return responseDTO;
     }
 
     private StockMovement findStockMovementEntityById(Long id) {
@@ -151,12 +212,12 @@ public class StockService {
         return product;
     }
 
-    private Batch findBatchEntityById(Long batchId) {
+    private Batch findBatchEntityForUpdate(Long batchId) {
         if (batchId == null) {
             throw new BadRequestException("Batch id is required.");
         }
 
-        return batchRepository.findById(batchId)
+        return batchRepository.findByIdForUpdate(batchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + batchId));
     }
 
@@ -230,6 +291,43 @@ public class StockService {
         return quantity;
     }
 
+    private void validateMovementAllowedForBatchStatus(Batch batch, MovementType movementType) {
+        if (movementType == null) {
+            throw new BadRequestException("Movement type is required.");
+        }
+
+        BatchStatus status = batch.getStatus();
+        if (status == null) {
+            throw new BadRequestException("Batch status is required for stock movements.");
+        }
+
+        switch (status) {
+            case AVAILABLE -> {
+                // All movement types are valid while the batch is operational.
+            }
+            case CONSUMED -> {
+                if (movementType != MovementType.INBOUND
+                        && movementType != MovementType.POSITIVE_ADJUSTMENT) {
+                    throw new BadRequestException(
+                            "Consumed batches only accept inbound or positive adjustment movements.");
+                }
+            }
+            case BLOCKED -> throw new BadRequestException("Blocked batches do not accept stock movements.");
+            case INACTIVE -> throw new BadRequestException("Inactive batches do not accept stock movements.");
+        }
+    }
+
+    private void updateBatchStatusAfterMovement(Batch batch, BigDecimal newBatchQuantity) {
+        if (newBatchQuantity.compareTo(BigDecimal.ZERO) == 0) {
+            batch.setStatus(BatchStatus.CONSUMED);
+            return;
+        }
+
+        if (BatchStatus.CONSUMED.equals(batch.getStatus())) {
+            batch.setStatus(BatchStatus.AVAILABLE);
+        }
+    }
+
     private BigDecimal normalizeCurrentBatchQuantity(BigDecimal batchQuantity) {
         if (batchQuantity == null) {
             throw new BadRequestException("Current batch quantity is required.");
@@ -272,6 +370,22 @@ public class StockService {
     private String normalizeText(String value) {
         return value == null ? null : value.trim();
     }
+
+    private PageRequest pageRequest(int page, int size) {
+        if (page < 0) {
+            throw new BadRequestException("Page index cannot be negative.");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("Page size must be between 1 and 100.");
+        }
+        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "movementDate"));
+    }
+
+    private record BatchStockAuditSnapshot(
+            Long batchId,
+            BigDecimal quantity,
+            BatchStatus status) {
+    }
 }
 
 /*
@@ -285,6 +399,8 @@ public class StockService {
  * En InVault el stock no se modifica directamente desde Product. El stock se
  * controla mediante lotes y movimientos auditables, lo que permite reconstruir
  * el historial de cambios del inventario.
+ * Cada movimiento publica un evento interno cuyo envio WebSocket se ejecuta solo
+ * despues de confirmar correctamente la transaccion.
  * El usuario responsable procede siempre del JWT autenticado y nunca del cuerpo
  * enviado por el cliente.
  */

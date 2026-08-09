@@ -5,10 +5,21 @@ spring:
   profiles:
     active: dev
 
+  flyway:
+    # Development keeps the pre-existing Hibernate-managed database compatible.
+    # Production explicitly enables the versioned migrations below.
+    enabled: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
 server:
   port: 8080
 
 invault:
+  realtime:
+    allowed-origins: ${INVAULT_REALTIME_ALLOWED_ORIGINS:http://localhost:4200}
   security:
     jwt:
       issuer: ${INVAULT_JWT_ISSUER:https://api.invault.local}

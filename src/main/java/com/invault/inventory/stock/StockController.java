@@ -1,6 +1,7 @@
 package com.invault.inventory.stock;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -12,7 +13,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.common.exception.UnauthorizedException;
@@ -37,6 +41,21 @@ public class StockController {
     @GetMapping("/{id}")
     public StockMovementResponseDTO findById(@PathVariable Long id) {
         return stockService.findById(id);
+    }
+
+    @GetMapping("/search")
+    public PageResponseDTO<StockMovementResponseDTO> search(
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) Long batchId,
+            @RequestParam(required = false) MovementType movementType,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+
+        return stockService.search(productId, batchId, movementType, from, to, page, size);
     }
 
     @GetMapping("/product/{productId}")

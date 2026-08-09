@@ -9,12 +9,25 @@ public enum AuditAction {
 
     CREATED,
     UPDATED,
+    ACTIVATED,
     DEACTIVATED,
     DELETED,
     STOCK_MOVEMENT_CREATED,
     LOGIN_SUCCESS,
     LOGIN_FAILED,
-    PASSWORD_CHANGED
+    LOGOUT,
+    PASSWORD_CHANGED,
+    PASSWORD_RESET;
+
+    public static AuditAction fromActiveChange(boolean before, boolean after) {
+        if (!before && after) {
+            return ACTIVATED;
+        }
+        if (before && !after) {
+            return DEACTIVATED;
+        }
+        return UPDATED;
+    }
 }
 
 /*

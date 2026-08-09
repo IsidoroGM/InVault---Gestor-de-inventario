@@ -6,11 +6,17 @@ import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.categories.Category;
 import com.invault.inventory.categories.CategoryRepository;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.locations.Location;
 import com.invault.inventory.locations.LocationRepository;
 import com.invault.inventory.products.dto.ProductRequestDTO;
@@ -27,19 +33,22 @@ public class ProductService {
     private final LocationRepository locationRepository;
     private final UnitRepository unitRepository;
     private final ProductMapper productMapper;
+    private final AuditService auditService;
 
     public ProductService(
             ProductRepository productRepository,
             CategoryRepository categoryRepository,
             LocationRepository locationRepository,
             UnitRepository unitRepository,
-            ProductMapper productMapper) {
+            ProductMapper productMapper,
+            AuditService auditService) {
 
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.locationRepository = locationRepository;
         this.unitRepository = unitRepository;
         this.productMapper = productMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -58,6 +67,20 @@ public class ProductService {
     public ProductResponseDTO findById(Long id) {
         Product product = findProductEntityById(id);
         return productMapper.toResponseDTO(product);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponseDTO<ProductResponseDTO> search(
+            String query,
+            Boolean active,
+            int page,
+            int size) {
+
+        PageRequest pageable = pageRequest(page, size, "name");
+        Page<ProductResponseDTO> result = productRepository
+                .search(normalizeSearchQuery(query), active, pageable)
+                .map(productMapper::toResponseDTO);
+        return PageResponseDTO.from(result);
     }
 
     public ProductResponseDTO create(ProductRequestDTO requestDTO) {
@@ -89,11 +112,15 @@ public class ProductService {
         }
 
         Product savedProduct = productRepository.save(product);
-        return productMapper.toResponseDTO(savedProduct);
+        ProductResponseDTO response = productMapper.toResponseDTO(savedProduct);
+        auditService.registerMutation(
+                AuditAction.CREATED, "Product", response.getId(), "Product created.", null, response);
+        return response;
     }
 
     public ProductResponseDTO update(Long id, ProductRequestDTO requestDTO) {
         Product product = findProductEntityById(id);
+        ProductResponseDTO before = productMapper.toResponseDTO(product);
 
         String normalizedSku = normalizeSku(requestDTO.getSku());
         String normalizedName = normalizeText(requestDTO.getName());
@@ -119,11 +146,16 @@ public class ProductService {
         }
 
         Product updatedProduct = productRepository.save(product);
-        return productMapper.toResponseDTO(updatedProduct);
+        ProductResponseDTO after = productMapper.toResponseDTO(updatedProduct);
+        auditService.registerMutation(
+                AuditAction.fromActiveChange(before.isActive(), after.isActive()),
+                "Product", after.getId(), "Product updated.", before, after);
+        return after;
     }
 
     public void deactivate(Long id) {
         Product product = findProductEntityById(id);
+        ProductResponseDTO before = productMapper.toResponseDTO(product);
 
         if (Boolean.FALSE.equals(product.getActive())) {
             throw new BadRequestException("Product is already inactive.");
@@ -131,6 +163,9 @@ public class ProductService {
 
         product.setActive(false);
         productRepository.save(product);
+        ProductResponseDTO after = productMapper.toResponseDTO(product);
+        auditService.registerMutation(
+                AuditAction.DEACTIVATED, "Product", id, "Product deactivated.", before, after);
     }
 
     private Product findProductEntityById(Long id) {
@@ -219,6 +254,21 @@ public class ProductService {
 
     private String normalizeText(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String normalizeSearchQuery(String value) {
+        String normalized = normalizeText(value);
+        return normalized == null || normalized.isBlank() ? null : normalized;
+    }
+
+    private PageRequest pageRequest(int page, int size, String sortProperty) {
+        if (page < 0) {
+            throw new BadRequestException("Page index cannot be negative.");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("Page size must be between 1 and 100.");
+        }
+        return PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, sortProperty));
     }
 }
 
