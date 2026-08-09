@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.roles.Role;
 import com.invault.inventory.roles.RoleName;
@@ -38,6 +39,9 @@ class UserServiceTests {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private AuditService auditService;
 
     @Test
     void createNormalizesIdentityHashesPasswordAndRequiresItsChange() {
@@ -105,7 +109,7 @@ class UserServiceTests {
     }
 
     private UserService service() {
-        return new UserService(userRepository, roleRepository, passwordEncoder, new UserMapper());
+        return new UserService(userRepository, roleRepository, passwordEncoder, new UserMapper(), auditService);
     }
 
     private User userWithId(Long id, String username, String hash) {

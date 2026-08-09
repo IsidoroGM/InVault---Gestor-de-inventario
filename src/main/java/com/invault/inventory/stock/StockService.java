@@ -12,6 +12,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.batches.Batch;
 import com.invault.inventory.batches.BatchRepository;
 import com.invault.inventory.batches.BatchStatus;
@@ -40,6 +42,7 @@ public class StockService {
     private final SupplierRepository supplierRepository;
     private final StockMovementMapper stockMovementMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final AuditService auditService;
 
     public StockService(
             StockMovementRepository stockMovementRepository,
@@ -48,7 +51,8 @@ public class StockService {
             UserRepository userRepository,
             SupplierRepository supplierRepository,
             StockMovementMapper stockMovementMapper,
-            ApplicationEventPublisher applicationEventPublisher) {
+            ApplicationEventPublisher applicationEventPublisher,
+            AuditService auditService) {
 
         this.stockMovementRepository = stockMovementRepository;
         this.productRepository = productRepository;
@@ -57,6 +61,7 @@ public class StockService {
         this.supplierRepository = supplierRepository;
         this.stockMovementMapper = stockMovementMapper;
         this.applicationEventPublisher = applicationEventPublisher;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -135,6 +140,7 @@ public class StockService {
         validateMovementAllowedForBatchStatus(batch, movementType);
         BigDecimal movementQuantity = normalizeMovementQuantity(requestDTO.getQuantity());
         BigDecimal previousBatchQuantity = normalizeCurrentBatchQuantity(batch.getQuantity());
+        BatchStatus previousBatchStatus = batch.getStatus();
         User user = findUserEntityById(authenticatedUserId);
         Supplier supplier = findOptionalSupplierById(requestDTO.getSupplierId());
 
@@ -169,6 +175,15 @@ public class StockService {
 
         StockMovement savedMovement = stockMovementRepository.save(stockMovement);
         StockMovementResponseDTO responseDTO = stockMovementMapper.toResponseDTO(savedMovement);
+
+        auditService.registerMutation(
+                AuditAction.STOCK_MOVEMENT_CREATED,
+                "StockMovement",
+                savedMovement.getId(),
+                "Stock movement created.",
+                new BatchStockAuditSnapshot(batch.getId(), previousBatchQuantity, previousBatchStatus),
+                new BatchStockAuditSnapshot(batch.getId(), newBatchQuantity, batch.getStatus())
+        );
 
         applicationEventPublisher.publishEvent(
                 new StockMovementRecordedEvent(InventoryEventDTO.stockUpdated(responseDTO))
@@ -364,6 +379,12 @@ public class StockService {
             throw new BadRequestException("Page size must be between 1 and 100.");
         }
         return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "movementDate"));
+    }
+
+    private record BatchStockAuditSnapshot(
+            Long batchId,
+            BigDecimal quantity,
+            BatchStatus status) {
     }
 }
 

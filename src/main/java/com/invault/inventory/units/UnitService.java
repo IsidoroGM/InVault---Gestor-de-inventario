@@ -5,6 +5,8 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.units.dto.UnitRequestDTO;
@@ -16,10 +18,12 @@ public class UnitService {
 
     private final UnitRepository unitRepository;
     private final UnitMapper unitMapper;
+    private final AuditService auditService;
 
-    public UnitService(UnitRepository unitRepository, UnitMapper unitMapper) {
+    public UnitService(UnitRepository unitRepository, UnitMapper unitMapper, AuditService auditService) {
         this.unitRepository = unitRepository;
         this.unitMapper = unitMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -60,11 +64,15 @@ public class UnitService {
         }
 
         Unit savedUnit = unitRepository.save(unit);
-        return unitMapper.toResponseDTO(savedUnit);
+        UnitResponseDTO response = unitMapper.toResponseDTO(savedUnit);
+        auditService.registerMutation(
+                AuditAction.CREATED, "Unit", response.getId(), "Unit created.", null, response);
+        return response;
     }
 
     public UnitResponseDTO update(Long id, UnitRequestDTO requestDTO) {
         Unit unit = findUnitEntityById(id);
+        UnitResponseDTO before = unitMapper.toResponseDTO(unit);
 
         String normalizedCode = normalizeText(requestDTO.getCode());
         String normalizedName = normalizeText(requestDTO.getName());
@@ -83,11 +91,16 @@ public class UnitService {
         }
 
         Unit updatedUnit = unitRepository.save(unit);
-        return unitMapper.toResponseDTO(updatedUnit);
+        UnitResponseDTO after = unitMapper.toResponseDTO(updatedUnit);
+        auditService.registerMutation(
+                AuditAction.fromActiveChange(before.isActive(), after.isActive()),
+                "Unit", after.getId(), "Unit updated.", before, after);
+        return after;
     }
 
     public void deactivate(Long id) {
         Unit unit = findUnitEntityById(id);
+        UnitResponseDTO before = unitMapper.toResponseDTO(unit);
 
         if (Boolean.FALSE.equals(unit.getActive())) {
             throw new BadRequestException("Unit is already inactive.");
@@ -95,6 +108,9 @@ public class UnitService {
 
         unit.setActive(false);
         unitRepository.save(unit);
+        UnitResponseDTO after = unitMapper.toResponseDTO(unit);
+        auditService.registerMutation(
+                AuditAction.DEACTIVATED, "Unit", id, "Unit deactivated.", before, after);
     }
 
     private Unit findUnitEntityById(Long id) {

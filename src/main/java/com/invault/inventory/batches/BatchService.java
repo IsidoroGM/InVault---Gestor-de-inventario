@@ -7,6 +7,8 @@ import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.batches.dto.BatchRequestDTO;
 import com.invault.inventory.batches.dto.BatchResponseDTO;
 import com.invault.inventory.common.exception.BadRequestException;
@@ -21,15 +23,18 @@ public class BatchService {
     private final BatchRepository batchRepository;
     private final ProductRepository productRepository;
     private final BatchMapper batchMapper;
+    private final AuditService auditService;
 
     public BatchService(
             BatchRepository batchRepository,
             ProductRepository productRepository,
-            BatchMapper batchMapper) {
+            BatchMapper batchMapper,
+            AuditService auditService) {
 
         this.batchRepository = batchRepository;
         this.productRepository = productRepository;
         this.batchMapper = batchMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -72,11 +77,15 @@ public class BatchService {
         batch.setNotes(normalizeText(requestDTO.getNotes()));
 
         Batch savedBatch = batchRepository.save(batch);
-        return batchMapper.toResponseDTO(savedBatch);
+        BatchResponseDTO response = batchMapper.toResponseDTO(savedBatch);
+        auditService.registerMutation(
+                AuditAction.CREATED, "Batch", response.getId(), "Batch created.", null, response);
+        return response;
     }
 
     public BatchResponseDTO update(Long id, BatchRequestDTO requestDTO) {
         Batch batch = findBatchEntityForUpdate(id);
+        BatchResponseDTO before = batchMapper.toResponseDTO(batch);
         Product product = findActiveProductById(requestDTO.getProductId());
 
         String normalizedBatchCode = normalizeBatchCode(requestDTO.getBatchCode());
@@ -97,7 +106,10 @@ public class BatchService {
         // La cantidad existente se conserva. Solo StockService puede modificarla.
 
         Batch updatedBatch = batchRepository.save(batch);
-        return batchMapper.toResponseDTO(updatedBatch);
+        BatchResponseDTO after = batchMapper.toResponseDTO(updatedBatch);
+        auditService.registerMutation(
+                AuditAction.UPDATED, "Batch", after.getId(), "Batch updated.", before, after);
+        return after;
     }
 
     private Batch findBatchEntityById(Long id) {

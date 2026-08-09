@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.invault.inventory.batches.dto.BatchRequestDTO;
 import com.invault.inventory.batches.dto.BatchResponseDTO;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
@@ -32,6 +33,9 @@ class BatchServiceTests {
 
     @Mock
     private BatchMapper batchMapper;
+
+    @Mock
+    private AuditService auditService;
 
     @InjectMocks
     private BatchService batchService;

@@ -5,15 +5,24 @@ import java.time.LocalDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import com.invault.inventory.audit.dto.AuditLogResponseDTO;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
-import com.invault.inventory.common.dto.PageResponseDTO;
-import com.invault.inventory.audit.dto.AuditLogResponseDTO;
 import com.invault.inventory.users.User;
 import com.invault.inventory.users.UserRepository;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Transactional
@@ -21,14 +30,21 @@ public class AuditService {
 
     private static final int ENTITY_NAME_MAX_LENGTH = 100;
     private static final int DETAILS_MAX_LENGTH = 500;
+    private static final int SNAPSHOT_MAX_LENGTH = 4000;
     private static final int CLIENT_IP_MAX_LENGTH = 60;
 
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
-    public AuditService(AuditLogRepository auditLogRepository, UserRepository userRepository) {
+    public AuditService(
+            AuditLogRepository auditLogRepository,
+            UserRepository userRepository,
+            ObjectMapper objectMapper) {
+
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
+        this.objectMapper = objectMapper;
     }
 
     public void registerUserAction(
@@ -40,7 +56,7 @@ public class AuditService {
             String clientIp) {
 
         User user = findUserEntityById(userId);
-        saveAuditLog(user, action, entityName, entityId, details, clientIp);
+        saveAuditLog(user, action, entityName, entityId, details, null, null, clientIp);
     }
 
     public void registerSystemAction(
@@ -50,8 +66,29 @@ public class AuditService {
             String details,
             String clientIp) {
 
-        // Las acciones automáticas no tienen un usuario responsable asociado.
-        saveAuditLog(null, action, entityName, entityId, details, clientIp);
+        saveAuditLog(null, action, entityName, entityId, details, null, null, clientIp);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void registerMutation(
+            AuditAction action,
+            String entityName,
+            Long entityId,
+            String details,
+            Object before,
+            Object after) {
+
+        User user = findUserEntityById(authenticatedUserId());
+        saveAuditLog(
+                user,
+                action,
+                entityName,
+                entityId,
+                details,
+                serializeSnapshot(before),
+                serializeSnapshot(after),
+                currentClientIp()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -91,6 +128,8 @@ public class AuditService {
             String entityName,
             Long entityId,
             String details,
+            String beforeData,
+            String afterData,
             String clientIp) {
 
         validateAction(action);
@@ -106,6 +145,16 @@ public class AuditService {
                 "Audit details cannot exceed 500 characters.",
                 DETAILS_MAX_LENGTH
         );
+        String normalizedBeforeData = normalizeOptionalText(
+                beforeData,
+                "Audit before snapshot cannot exceed 4000 characters.",
+                SNAPSHOT_MAX_LENGTH
+        );
+        String normalizedAfterData = normalizeOptionalText(
+                afterData,
+                "Audit after snapshot cannot exceed 4000 characters.",
+                SNAPSHOT_MAX_LENGTH
+        );
         String normalizedClientIp = normalizeOptionalText(
                 clientIp,
                 "Client IP cannot exceed 60 characters.",
@@ -118,6 +167,8 @@ public class AuditService {
                 normalizedEntityName,
                 entityId,
                 normalizedDetails,
+                normalizedBeforeData,
+                normalizedAfterData,
                 normalizedClientIp
         );
 
@@ -165,6 +216,8 @@ public class AuditService {
                 auditLog.getEntityName(),
                 auditLog.getEntityId(),
                 auditLog.getDetails(),
+                auditLog.getBeforeData(),
+                auditLog.getAfterData(),
                 auditLog.getClientIp(),
                 auditLog.getCreatedAt()
         );
@@ -217,12 +270,41 @@ public class AuditService {
         String normalizedValue = value.trim();
         return normalizedValue.isBlank() ? null : normalizedValue;
     }
+
+    private String serializeSnapshot(Object snapshot) {
+        if (snapshot == null) {
+            return null;
+        }
+
+        try {
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Audit snapshot could not be serialized.", exception);
+        }
+    }
+
+    private Long authenticatedUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
+            throw new BadRequestException("Authenticated user is required for a mutation audit action.");
+        }
+
+        Number userId = jwt.getClaim("userId");
+        if (userId == null || userId.longValue() <= 0) {
+            throw new BadRequestException("Authenticated user id is required for a mutation audit action.");
+        }
+        return userId.longValue();
+    }
+
+    private String currentClientIp() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
+            return attributes.getRequest().getRemoteAddr();
+        }
+        return null;
+    }
 }
 
 /*
- * AuditService centraliza el registro de acciones relevantes de InVault.
- *
- * Permite guardar acciones realizadas por usuarios y acciones automáticas del
- * sistema, valida los datos antes de persistirlos y mantiene AuditLog dentro de
- * la capa de servicio para no exponer directamente la entidad JPA.
+ * Mutation audit records join the caller's transaction. Any audit failure is
+ * therefore propagated and rolls back the corresponding business operation.
  */

@@ -36,5 +36,17 @@ class FlywayMigrationTests {
         );
 
         assertEquals(11, businessTables);
+
+        Integer auditSnapshotColumns = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'audit_logs'
+                  AND column_name IN ('before_data', 'after_data')
+                """,
+                Integer.class
+        );
+
+        assertEquals(2, auditSnapshotColumns);
     }
 }

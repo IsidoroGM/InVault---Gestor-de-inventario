@@ -10,6 +10,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.categories.Category;
 import com.invault.inventory.categories.CategoryRepository;
 import com.invault.inventory.common.exception.BadRequestException;
@@ -31,19 +33,22 @@ public class ProductService {
     private final LocationRepository locationRepository;
     private final UnitRepository unitRepository;
     private final ProductMapper productMapper;
+    private final AuditService auditService;
 
     public ProductService(
             ProductRepository productRepository,
             CategoryRepository categoryRepository,
             LocationRepository locationRepository,
             UnitRepository unitRepository,
-            ProductMapper productMapper) {
+            ProductMapper productMapper,
+            AuditService auditService) {
 
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.locationRepository = locationRepository;
         this.unitRepository = unitRepository;
         this.productMapper = productMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -107,11 +112,15 @@ public class ProductService {
         }
 
         Product savedProduct = productRepository.save(product);
-        return productMapper.toResponseDTO(savedProduct);
+        ProductResponseDTO response = productMapper.toResponseDTO(savedProduct);
+        auditService.registerMutation(
+                AuditAction.CREATED, "Product", response.getId(), "Product created.", null, response);
+        return response;
     }
 
     public ProductResponseDTO update(Long id, ProductRequestDTO requestDTO) {
         Product product = findProductEntityById(id);
+        ProductResponseDTO before = productMapper.toResponseDTO(product);
 
         String normalizedSku = normalizeSku(requestDTO.getSku());
         String normalizedName = normalizeText(requestDTO.getName());
@@ -137,11 +146,16 @@ public class ProductService {
         }
 
         Product updatedProduct = productRepository.save(product);
-        return productMapper.toResponseDTO(updatedProduct);
+        ProductResponseDTO after = productMapper.toResponseDTO(updatedProduct);
+        auditService.registerMutation(
+                AuditAction.fromActiveChange(before.isActive(), after.isActive()),
+                "Product", after.getId(), "Product updated.", before, after);
+        return after;
     }
 
     public void deactivate(Long id) {
         Product product = findProductEntityById(id);
+        ProductResponseDTO before = productMapper.toResponseDTO(product);
 
         if (Boolean.FALSE.equals(product.getActive())) {
             throw new BadRequestException("Product is already inactive.");
@@ -149,6 +163,9 @@ public class ProductService {
 
         product.setActive(false);
         productRepository.save(product);
+        ProductResponseDTO after = productMapper.toResponseDTO(product);
+        auditService.registerMutation(
+                AuditAction.DEACTIVATED, "Product", id, "Product deactivated.", before, after);
     }
 
     private Product findProductEntityById(Long id) {

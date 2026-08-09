@@ -10,6 +10,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.roles.Role;
@@ -29,17 +31,20 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
+    private final AuditService auditService;
 
     public UserService(
             UserRepository userRepository,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
-            UserMapper userMapper) {
+            UserMapper userMapper,
+            AuditService auditService) {
 
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.userMapper = userMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -68,11 +73,16 @@ public class UserService {
         user.setMustChangePassword(true);
         user.setRoles(loadActiveRoles(requestDTO.roles()));
 
-        return userMapper.toResponseDTO(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+        UserResponseDTO response = userMapper.toResponseDTO(savedUser);
+        auditService.registerMutation(
+                AuditAction.CREATED, "User", savedUser.getId(), "User created.", null, response);
+        return response;
     }
 
     public UserResponseDTO update(Long id, UserUpdateRequestDTO requestDTO) {
         User user = findUserById(id);
+        UserResponseDTO before = userMapper.toResponseDTO(user);
         String email = normalizeEmail(requestDTO.email());
         Set<Role> roles = loadActiveRoles(requestDTO.roles());
 
@@ -81,11 +91,16 @@ public class UserService {
 
         user.setEmail(email);
         user.setRoles(roles);
-        return userMapper.toResponseDTO(userRepository.save(user));
+        User updatedUser = userRepository.save(user);
+        UserResponseDTO after = userMapper.toResponseDTO(updatedUser);
+        auditService.registerMutation(
+                AuditAction.UPDATED, "User", id, "User updated.", before, after);
+        return after;
     }
 
     public void deactivate(Long id, Long authenticatedUserId) {
         User user = findUserById(id);
+        UserResponseDTO before = userMapper.toResponseDTO(user);
 
         if (id.equals(authenticatedUserId)) {
             throw new BadRequestException("You cannot deactivate your own account.");
@@ -97,20 +112,28 @@ public class UserService {
         protectLastAdministrator(user, user.getRoles(), false);
         user.setActive(false);
         userRepository.save(user);
+        UserResponseDTO after = userMapper.toResponseDTO(user);
+        auditService.registerMutation(
+                AuditAction.DEACTIVATED, "User", id, "User deactivated.", before, after);
     }
 
     public void activate(Long id) {
         User user = findUserById(id);
+        UserResponseDTO before = userMapper.toResponseDTO(user);
         if (Boolean.TRUE.equals(user.getActive())) {
             throw new BadRequestException("User is already active.");
         }
 
         user.setActive(true);
         userRepository.save(user);
+        UserResponseDTO after = userMapper.toResponseDTO(user);
+        auditService.registerMutation(
+                AuditAction.ACTIVATED, "User", id, "User activated.", before, after);
     }
 
     public void changeOwnPassword(Long authenticatedUserId, PasswordChangeRequestDTO requestDTO) {
         User user = findUserById(authenticatedUserId);
+        UserResponseDTO before = userMapper.toResponseDTO(user);
 
         if (!passwordEncoder.matches(requestDTO.currentPassword(), user.getPasswordHash())) {
             throw new BadRequestException("Current password is incorrect.");
@@ -122,13 +145,26 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(requestDTO.newPassword()));
         user.setMustChangePassword(false);
         userRepository.save(user);
+        UserResponseDTO after = userMapper.toResponseDTO(user);
+        auditService.registerMutation(
+                AuditAction.PASSWORD_CHANGED,
+                "User",
+                authenticatedUserId,
+                "User changed own password.",
+                before,
+                after
+        );
     }
 
     public void resetPassword(Long id, PasswordResetRequestDTO requestDTO) {
         User user = findUserById(id);
+        UserResponseDTO before = userMapper.toResponseDTO(user);
         user.setPasswordHash(passwordEncoder.encode(requestDTO.temporaryPassword()));
         user.setMustChangePassword(true);
         userRepository.save(user);
+        UserResponseDTO after = userMapper.toResponseDTO(user);
+        auditService.registerMutation(
+                AuditAction.PASSWORD_RESET, "User", id, "User password reset.", before, after);
     }
 
     private User findUserById(Long id) {

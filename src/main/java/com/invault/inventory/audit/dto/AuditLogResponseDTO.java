@@ -12,6 +12,8 @@ public record AuditLogResponseDTO(
         String entityName,
         Long entityId,
         String details,
+        String beforeData,
+        String afterData,
         String clientIp,
         LocalDateTime createdAt) {
 }

@@ -25,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.invault.inventory.batches.Batch;
 import com.invault.inventory.batches.BatchRepository;
 import com.invault.inventory.batches.BatchStatus;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
@@ -59,6 +60,9 @@ class StockServiceTests {
 
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
+
+    @Mock
+    private AuditService auditService;
 
     @InjectMocks
     private StockService stockService;
