@@ -1,10 +1,17 @@
 package com.invault.inventory.audit;
 
+import java.time.LocalDateTime;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
+import com.invault.inventory.common.dto.PageResponseDTO;
+import com.invault.inventory.audit.dto.AuditLogResponseDTO;
 import com.invault.inventory.users.User;
 import com.invault.inventory.users.UserRepository;
 
@@ -45,6 +52,37 @@ public class AuditService {
 
         // Las acciones automáticas no tienen un usuario responsable asociado.
         saveAuditLog(null, action, entityName, entityId, details, clientIp);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponseDTO<AuditLogResponseDTO> search(
+            AuditAction action,
+            String entityName,
+            Long userId,
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            int page,
+            int size) {
+
+        validateDateRange(fromDate, toDate);
+        PageRequest pageable = pageRequest(page, size);
+        Page<AuditLogResponseDTO> result = auditLogRepository.search(
+                action,
+                normalizeText(entityName),
+                userId,
+                fromDate,
+                toDate,
+                pageable
+        ).map(this::toResponseDTO);
+
+        return PageResponseDTO.from(result);
+    }
+
+    @Transactional(readOnly = true)
+    public AuditLogResponseDTO findById(Long id) {
+        AuditLog auditLog = auditLogRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Audit log not found with id: " + id));
+        return toResponseDTO(auditLog);
     }
 
     private void saveAuditLog(
@@ -99,6 +137,37 @@ public class AuditService {
         if (action == null) {
             throw new BadRequestException("Audit action is required.");
         }
+    }
+
+    private void validateDateRange(LocalDateTime fromDate, LocalDateTime toDate) {
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+            throw new BadRequestException("Audit start date cannot be after end date.");
+        }
+    }
+
+    private PageRequest pageRequest(int page, int size) {
+        if (page < 0) {
+            throw new BadRequestException("Page index cannot be negative.");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("Page size must be between 1 and 100.");
+        }
+        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+
+    private AuditLogResponseDTO toResponseDTO(AuditLog auditLog) {
+        User user = auditLog.getUser();
+        return new AuditLogResponseDTO(
+                auditLog.getId(),
+                user != null ? user.getId() : null,
+                user != null ? user.getUsername() : null,
+                auditLog.getAction(),
+                auditLog.getEntityName(),
+                auditLog.getEntityId(),
+                auditLog.getDetails(),
+                auditLog.getClientIp(),
+                auditLog.getCreatedAt()
+        );
     }
 
     private void validateEntityId(Long entityId) {

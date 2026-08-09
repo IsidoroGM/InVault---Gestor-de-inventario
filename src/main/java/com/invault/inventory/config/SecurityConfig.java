@@ -21,8 +21,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 import com.invault.inventory.auth.InVaultUserDetailsService;
+import com.invault.inventory.audit.AuditService;
+import com.invault.inventory.audit.SuccessfulMutationAuditFilter;
 
 @Configuration
 public class SecurityConfig {
@@ -35,7 +38,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            AuditService auditService) throws Exception {
 
         return http
                 .cors(Customizer.withDefaults())
@@ -46,9 +50,30 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/health", "/api/auth/login", "/error").permitAll()
+                        .requestMatchers(
+                                "/api/health",
+                                "/api/auth/login",
+                                "/error",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**")
+                        .permitAll()
                         // The STOMP CONNECT frame performs JWT authentication.
                         .requestMatchers("/ws", "/ws/**").permitAll()
+
+                        // Every authenticated account can replace its own password.
+                        .requestMatchers(HttpMethod.PUT, "/api/users/me/password")
+                        .hasAnyRole(ADMIN, SUPERVISOR, WAREHOUSE, READ_ONLY)
+
+                        // User and audit administration is limited to management roles.
+                        .requestMatchers(HttpMethod.GET, "/api/users/**", "/api/roles/**", "/api/audit-logs/**")
+                        .hasAnyRole(ADMIN, SUPERVISOR)
+                        .requestMatchers(HttpMethod.POST, "/api/users")
+                        .hasRole(ADMIN)
+                        .requestMatchers(HttpMethod.PUT, "/api/users/**")
+                        .hasRole(ADMIN)
+                        .requestMatchers(HttpMethod.PATCH, "/api/users/**")
+                        .hasRole(ADMIN)
 
                         // Every official role can consult inventory information.
                         .requestMatchers(HttpMethod.GET, "/api/**")
@@ -88,6 +113,10 @@ public class SecurityConfig {
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
+                )
+                .addFilterAfter(
+                        new SuccessfulMutationAuditFilter(auditService),
+                        AuthorizationFilter.class
                 )
                 .build();
     }

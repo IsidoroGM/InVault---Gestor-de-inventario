@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,7 +18,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import com.invault.inventory.audit.dto.AuditLogResponseDTO;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.users.User;
@@ -167,6 +173,47 @@ class AuditServiceTests {
 
         assertEquals("Audit entity id must be greater than zero.", exception.getMessage());
         verify(auditLogRepository, never()).save(org.mockito.ArgumentMatchers.any(AuditLog.class));
+    }
+
+    @Test
+    void searchReturnsAStablePagedAuditContract() {
+        User user = new User("operator", "operator@example.com", "hash");
+        ReflectionTestUtils.setField(user, "id", 12L);
+        AuditLog auditLog = new AuditLog(
+                user,
+                AuditAction.UPDATED,
+                "Product",
+                34L,
+                "Product data updated",
+                "192.168.1.20"
+        );
+        LocalDateTime createdAt = LocalDateTime.of(2026, 8, 6, 12, 0);
+        ReflectionTestUtils.setField(auditLog, "id", 50L);
+        ReflectionTestUtils.setField(auditLog, "createdAt", createdAt);
+
+        when(auditLogRepository.search(
+                org.mockito.ArgumentMatchers.eq(AuditAction.UPDATED),
+                org.mockito.ArgumentMatchers.eq("Product"),
+                org.mockito.ArgumentMatchers.eq(12L),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any(Pageable.class)
+        )).thenReturn(new PageImpl<>(java.util.List.of(auditLog)));
+
+        PageResponseDTO<AuditLogResponseDTO> result = auditService.search(
+                AuditAction.UPDATED,
+                "  Product  ",
+                12L,
+                null,
+                null,
+                0,
+                25
+        );
+
+        assertEquals(1, result.totalElements());
+        assertEquals(50L, result.content().getFirst().id());
+        assertEquals("operator", result.content().getFirst().username());
+        assertEquals(createdAt, result.content().getFirst().createdAt());
     }
 
     private AuditLog captureSavedAuditLog() {

@@ -15,6 +15,9 @@ spring:
       hibernate:
         format_sql: false
 
+  flyway:
+    enabled: true
+
 invault:
   realtime:
     allowed-origins: ${INVAULT_REALTIME_ALLOWED_ORIGINS}

@@ -1,6 +1,7 @@
 package com.invault.inventory.auth;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -28,13 +29,16 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.invault.inventory.auth.dto.LoginRequestDTO;
 import com.invault.inventory.auth.dto.LoginResponseDTO;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.categories.CategoryService;
 import com.invault.inventory.categories.dto.CategoryRequestDTO;
 import com.invault.inventory.categories.dto.CategoryResponseDTO;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.stock.StockService;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.units.UnitService;
+import com.invault.inventory.users.UserService;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -59,6 +63,12 @@ class SecurityAuthorizationTests {
     @MockitoBean
     private StockService stockService;
 
+    @MockitoBean
+    private UserService userService;
+
+    @MockitoBean
+    private AuditService auditService;
+
     @Test
     void loginAndHealthRemainPublic() throws Exception {
         LoginResponseDTO response = new LoginResponseDTO(
@@ -82,6 +92,14 @@ class SecurityAuthorizationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.roles[0]").value("ADMIN"));
+    }
+
+    @Test
+    void openApiDocumentationRemainsPublicAndDescribesInVault() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("InVault API"))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"));
     }
 
     @Test
@@ -155,6 +173,30 @@ class SecurityAuthorizationTests {
         mockMvc.perform(get("/api/products")
                         .header("Authorization", "Bearer invalid-token"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void userAndAuditQueriesAreRestrictedToManagementRoles() throws Exception {
+        when(userService.findAll()).thenReturn(List.of());
+        when(auditService.search(any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageResponseDTO<>(List.of(), 0, 25, 0, 0, true, true));
+
+        mockMvc.perform(get("/api/users")
+                        .header("Authorization", bearerToken("READ_ONLY")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/audit-logs")
+                        .header("Authorization", bearerToken("WAREHOUSE")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/users")
+                        .header("Authorization", bearerToken("SUPERVISOR")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/audit-logs")
+                        .header("Authorization", bearerToken("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
     }
 
     private String bearerToken(String role) {

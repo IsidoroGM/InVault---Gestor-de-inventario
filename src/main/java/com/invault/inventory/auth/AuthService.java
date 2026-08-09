@@ -58,7 +58,7 @@ public class AuthService {
             throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
         }
 
-        User user = userRepository.findByUsernameAndActiveTrue(username)
+        User user = userRepository.findByUsernameIgnoreCaseAndActiveTrue(username)
                 .orElseThrow(() -> new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE));
 
         List<String> roles = jwtService.activeRoleNames(user);

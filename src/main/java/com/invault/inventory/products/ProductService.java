@@ -6,11 +6,15 @@ import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import com.invault.inventory.categories.Category;
 import com.invault.inventory.categories.CategoryRepository;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.locations.Location;
 import com.invault.inventory.locations.LocationRepository;
 import com.invault.inventory.products.dto.ProductRequestDTO;
@@ -58,6 +62,20 @@ public class ProductService {
     public ProductResponseDTO findById(Long id) {
         Product product = findProductEntityById(id);
         return productMapper.toResponseDTO(product);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponseDTO<ProductResponseDTO> search(
+            String query,
+            Boolean active,
+            int page,
+            int size) {
+
+        PageRequest pageable = pageRequest(page, size, "name");
+        Page<ProductResponseDTO> result = productRepository
+                .search(normalizeSearchQuery(query), active, pageable)
+                .map(productMapper::toResponseDTO);
+        return PageResponseDTO.from(result);
     }
 
     public ProductResponseDTO create(ProductRequestDTO requestDTO) {
@@ -219,6 +237,21 @@ public class ProductService {
 
     private String normalizeText(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String normalizeSearchQuery(String value) {
+        String normalized = normalizeText(value);
+        return normalized == null || normalized.isBlank() ? null : normalized;
+    }
+
+    private PageRequest pageRequest(int page, int size, String sortProperty) {
+        if (page < 0) {
+            throw new BadRequestException("Page index cannot be negative.");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("Page size must be between 1 and 100.");
+        }
+        return PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, sortProperty));
     }
 }
 

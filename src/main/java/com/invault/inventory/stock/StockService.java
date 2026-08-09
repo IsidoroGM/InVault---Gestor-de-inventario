@@ -1,10 +1,14 @@
 package com.invault.inventory.stock;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +16,7 @@ import com.invault.inventory.batches.Batch;
 import com.invault.inventory.batches.BatchRepository;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
 import com.invault.inventory.realtime.InventoryEventDTO;
@@ -88,6 +93,32 @@ public class StockService {
     public StockMovementResponseDTO findById(Long id) {
         StockMovement stockMovement = findStockMovementEntityById(id);
         return stockMovementMapper.toResponseDTO(stockMovement);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponseDTO<StockMovementResponseDTO> search(
+            Long productId,
+            Long batchId,
+            MovementType movementType,
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            int page,
+            int size) {
+
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+            throw new BadRequestException("Movement start date cannot be after end date.");
+        }
+        PageRequest pageable = pageRequest(page, size);
+        Page<StockMovementResponseDTO> result = stockMovementRepository.search(
+                productId,
+                batchId,
+                movementType,
+                fromDate,
+                toDate,
+                pageable
+        ).map(stockMovementMapper::toResponseDTO);
+
+        return PageResponseDTO.from(result);
     }
 
     public StockMovementResponseDTO createMovement(
@@ -283,6 +314,16 @@ public class StockService {
 
     private String normalizeText(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private PageRequest pageRequest(int page, int size) {
+        if (page < 0) {
+            throw new BadRequestException("Page index cannot be negative.");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("Page size must be between 1 and 100.");
+        }
+        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "movementDate"));
     }
 }
 

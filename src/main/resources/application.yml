@@ -5,6 +5,15 @@ spring:
   profiles:
     active: dev
 
+  flyway:
+    # Development keeps the pre-existing Hibernate-managed database compatible.
+    # Production explicitly enables the versioned migrations below.
+    enabled: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
 server:
   port: 8080
 

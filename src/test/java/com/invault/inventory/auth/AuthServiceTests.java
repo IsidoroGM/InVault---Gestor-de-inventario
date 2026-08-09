@@ -57,7 +57,7 @@ class AuthServiceTests {
 
         when(authenticationManager.authenticate(any(Authentication.class)))
                 .thenReturn(anyAuthentication());
-        when(userRepository.findByUsernameAndActiveTrue("operator")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameIgnoreCaseAndActiveTrue("operator")).thenReturn(Optional.of(user));
         when(userRepository.save(user)).thenReturn(user);
         when(jwtService.activeRoleNames(user)).thenReturn(List.of("WAREHOUSE"));
         when(jwtService.generateToken(user)).thenReturn(new TokenDetails("signed-token", expiresAt, 300));
@@ -110,7 +110,7 @@ class AuthServiceTests {
 
         when(authenticationManager.authenticate(any(Authentication.class)))
                 .thenReturn(anyAuthentication());
-        when(userRepository.findByUsernameAndActiveTrue("reader")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameIgnoreCaseAndActiveTrue("reader")).thenReturn(Optional.of(user));
         when(jwtService.activeRoleNames(user)).thenReturn(List.of());
 
         UnauthorizedException exception = assertThrows(
