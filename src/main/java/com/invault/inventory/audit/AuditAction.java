@@ -15,6 +15,7 @@ public enum AuditAction {
     STOCK_MOVEMENT_CREATED,
     LOGIN_SUCCESS,
     LOGIN_FAILED,
+    LOGOUT,
     PASSWORD_CHANGED,
     PASSWORD_RESET;
 

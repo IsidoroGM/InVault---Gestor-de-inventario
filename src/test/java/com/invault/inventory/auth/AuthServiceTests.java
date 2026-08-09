@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -126,6 +128,27 @@ class AuthServiceTests {
                 9L,
                 "Login rejected because the user has no active role.",
                 "127.0.0.1"
+        );
+    }
+
+    @Test
+    void logoutIncrementsSessionVersionAndAuditsRevocation() {
+        User user = new User("operator", "operator@example.com", "hash");
+        ReflectionTestUtils.setField(user, "id", 4L);
+        when(userRepository.findById(4L)).thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
+
+        authService.logout(4L);
+
+        assertEquals(1L, user.getTokenVersion());
+        verify(userRepository).save(user);
+        verify(auditService).registerMutation(
+                eq(AuditAction.LOGOUT),
+                eq("User"),
+                eq(4L),
+                anyString(),
+                any(),
+                any()
         );
     }
 

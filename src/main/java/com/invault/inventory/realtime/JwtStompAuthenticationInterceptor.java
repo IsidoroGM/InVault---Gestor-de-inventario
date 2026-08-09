@@ -59,6 +59,10 @@ public class JwtStompAuthenticationInterceptor implements ChannelInterceptor {
 
         try {
             Jwt jwt = jwtDecoder.decode(tokenValue);
+            if (Boolean.TRUE.equals(jwt.getClaim("mustChangePassword"))) {
+                throw new BadCredentialsException(
+                        "Password change is required before opening a WebSocket connection.");
+            }
             AbstractAuthenticationToken authentication = authenticationConverter.convert(jwt);
 
             if (authentication == null || !authentication.isAuthenticated()) {

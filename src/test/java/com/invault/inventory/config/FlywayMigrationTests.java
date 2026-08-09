@@ -48,5 +48,17 @@ class FlywayMigrationTests {
         );
 
         assertEquals(2, auditSnapshotColumns);
+
+        Integer tokenVersionColumns = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'users'
+                  AND column_name = 'token_version'
+                """,
+                Integer.class
+        );
+
+        assertEquals(1, tokenVersionColumns);
     }
 }

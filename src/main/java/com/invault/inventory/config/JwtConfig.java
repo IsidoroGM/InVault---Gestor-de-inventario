@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
 import com.invault.inventory.auth.JwtProperties;
 import com.invault.inventory.auth.SecurityBootstrapProperties;
+import com.invault.inventory.auth.UserSessionTokenValidator;
 
 @Configuration
 @EnableConfigurationProperties({JwtProperties.class, SecurityBootstrapProperties.class})
@@ -51,13 +52,17 @@ public class JwtConfig {
     }
 
     @Bean
-    public JwtDecoder jwtDecoder(SecretKey jwtSecretKey, JwtProperties properties) {
+    public JwtDecoder jwtDecoder(
+            SecretKey jwtSecretKey,
+            JwtProperties properties,
+            UserSessionTokenValidator userSessionTokenValidator) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
 
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<Jwt>(
-                JwtValidators.createDefaultWithIssuer(properties.issuer())
+                JwtValidators.createDefaultWithIssuer(properties.issuer()),
+                userSessionTokenValidator
         ));
 
         return decoder;

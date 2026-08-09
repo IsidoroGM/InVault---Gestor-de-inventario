@@ -7,6 +7,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.invault.inventory.audit.AuditAction;
 import com.invault.inventory.audit.AuditService;
@@ -100,6 +101,27 @@ public class AuthService {
                 roles,
                 Boolean.TRUE.equals(user.getMustChangePassword())
         );
+    }
+
+    @Transactional
+    public void logout(Long authenticatedUserId) {
+        User user = userRepository.findById(authenticatedUserId)
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user is no longer available."));
+        long previousVersion = user.getTokenVersion();
+        long currentVersion = user.revokeActiveTokens();
+        userRepository.save(user);
+
+        auditService.registerMutation(
+                AuditAction.LOGOUT,
+                "User",
+                authenticatedUserId,
+                "User logged out and revoked active tokens.",
+                new SessionVersionAuditSnapshot(authenticatedUserId, previousVersion),
+                new SessionVersionAuditSnapshot(authenticatedUserId, currentVersion)
+        );
+    }
+
+    private record SessionVersionAuditSnapshot(Long userId, long tokenVersion) {
     }
 }
 

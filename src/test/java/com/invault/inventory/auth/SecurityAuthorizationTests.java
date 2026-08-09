@@ -4,9 +4,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -23,6 +26,7 @@ import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -68,6 +72,15 @@ class SecurityAuthorizationTests {
 
     @MockitoBean
     private AuditService auditService;
+
+    @MockitoBean
+    private UserSessionTokenValidator userSessionTokenValidator;
+
+    @BeforeEach
+    void allowSignedTestSessions() {
+        when(userSessionTokenValidator.validate(any()))
+                .thenReturn(OAuth2TokenValidatorResult.success());
+    }
 
     @Test
     void loginAndHealthRemainPublic() throws Exception {
@@ -199,7 +212,34 @@ class SecurityAuthorizationTests {
                 .andExpect(jsonPath("$.content").isArray());
     }
 
+    @Test
+    void mandatoryPasswordChangeBlocksOtherResourcesButAllowsPasswordAndLogout() throws Exception {
+        String restrictedToken = bearerToken("WAREHOUSE", true);
+
+        mockMvc.perform(get("/api/units")
+                        .header("Authorization", restrictedToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("Password change is required before accessing this resource."));
+
+        mockMvc.perform(put("/api/users/me/password")
+                        .header("Authorization", restrictedToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Current-1234\",\"newPassword\":\"New-password-123\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", restrictedToken))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout(99L);
+    }
+
     private String bearerToken(String role) {
+        return bearerToken(role, false);
+    }
+
+    private String bearerToken(String role, boolean mustChangePassword) {
         Instant issuedAt = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("https://api.invault.local")
@@ -208,7 +248,8 @@ class SecurityAuthorizationTests {
                 .subject("security-test-user")
                 .claim("userId", 99L)
                 .claim("roles", List.of(role))
-                .claim("mustChangePassword", false)
+                .claim("mustChangePassword", mustChangePassword)
+                .claim("tokenVersion", 0L)
                 .build();
 
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();

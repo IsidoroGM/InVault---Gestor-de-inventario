@@ -41,6 +41,7 @@ public class JwtService {
                 .claim("userId", user.getId())
                 .claim("roles", roles)
                 .claim("mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()))
+                .claim("tokenVersion", user.getTokenVersion())
                 .build();
 
         String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

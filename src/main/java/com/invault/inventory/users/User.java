@@ -55,6 +55,10 @@ public class User {
     @Column(name = "must_change_password", nullable = false)
     private Boolean mustChangePassword = false;
 
+    // Incrementing this value invalidates every JWT issued with an older version.
+    @Column(name = "token_version", nullable = false)
+    private Long tokenVersion = 0L;
+
     // Stores the last successful login date and time.
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
@@ -100,6 +104,7 @@ public class User {
         this.passwordHash = passwordHash;
         this.active = true;
         this.mustChangePassword = false;
+        this.tokenVersion = 0L;
     }
 
     @PrePersist
@@ -113,6 +118,10 @@ public class User {
 
         if (this.mustChangePassword == null) {
             this.mustChangePassword = false;
+        }
+
+        if (this.tokenVersion == null) {
+            this.tokenVersion = 0L;
         }
     }
 
@@ -175,6 +184,16 @@ public class User {
 
     public void setMustChangePassword(Boolean mustChangePassword) {
         this.mustChangePassword = mustChangePassword;
+    }
+
+    public Long getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public long revokeActiveTokens() {
+        long currentVersion = tokenVersion == null ? 0L : tokenVersion;
+        tokenVersion = Math.incrementExact(currentVersion);
+        return tokenVersion;
     }
 
     public LocalDateTime getLastLoginAt() {

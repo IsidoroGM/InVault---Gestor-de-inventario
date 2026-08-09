@@ -41,7 +41,7 @@ class JwtStompAuthenticationInterceptorTests {
 
     @Test
     void connectAuthenticatesBearerTokenAndStoresPrincipal() {
-        Jwt jwt = testJwt();
+        Jwt jwt = testJwt(false);
         JwtAuthenticationToken authentication = new JwtAuthenticationToken(
                 jwt,
                 List.of(new SimpleGrantedAuthority("ROLE_READ_ONLY"))
@@ -75,6 +75,17 @@ class JwtStompAuthenticationInterceptorTests {
         );
     }
 
+    @Test
+    void connectRejectsSessionThatRequiresPasswordChange() {
+        Jwt jwt = testJwt(true);
+        when(jwtDecoder.decode("signed-token")).thenReturn(jwt);
+
+        assertThrows(
+                BadCredentialsException.class,
+                () -> interceptor.preSend(connectMessage("Bearer signed-token"), channel)
+        );
+    }
+
     private Message<byte[]> connectMessage(String authorizationHeader) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
         if (authorizationHeader != null) {
@@ -84,7 +95,7 @@ class JwtStompAuthenticationInterceptorTests {
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
 
-    private Jwt testJwt() {
+    private Jwt testJwt(boolean mustChangePassword) {
         Instant now = Instant.now();
         return Jwt.withTokenValue("signed-token")
                 .header("alg", "HS256")
@@ -92,6 +103,7 @@ class JwtStompAuthenticationInterceptorTests {
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(300))
                 .claim("roles", List.of("READ_ONLY"))
+                .claim("mustChangePassword", mustChangePassword)
                 .build();
     }
 }

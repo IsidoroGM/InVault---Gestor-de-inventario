@@ -91,6 +91,7 @@ public class UserService {
 
         user.setEmail(email);
         user.setRoles(roles);
+        user.revokeActiveTokens();
         User updatedUser = userRepository.save(user);
         UserResponseDTO after = userMapper.toResponseDTO(updatedUser);
         auditService.registerMutation(
@@ -111,6 +112,7 @@ public class UserService {
 
         protectLastAdministrator(user, user.getRoles(), false);
         user.setActive(false);
+        user.revokeActiveTokens();
         userRepository.save(user);
         UserResponseDTO after = userMapper.toResponseDTO(user);
         auditService.registerMutation(
@@ -125,6 +127,7 @@ public class UserService {
         }
 
         user.setActive(true);
+        user.revokeActiveTokens();
         userRepository.save(user);
         UserResponseDTO after = userMapper.toResponseDTO(user);
         auditService.registerMutation(
@@ -144,6 +147,7 @@ public class UserService {
 
         user.setPasswordHash(passwordEncoder.encode(requestDTO.newPassword()));
         user.setMustChangePassword(false);
+        user.revokeActiveTokens();
         userRepository.save(user);
         UserResponseDTO after = userMapper.toResponseDTO(user);
         auditService.registerMutation(
@@ -161,6 +165,7 @@ public class UserService {
         UserResponseDTO before = userMapper.toResponseDTO(user);
         user.setPasswordHash(passwordEncoder.encode(requestDTO.temporaryPassword()));
         user.setMustChangePassword(true);
+        user.revokeActiveTokens();
         userRepository.save(user);
         UserResponseDTO after = userMapper.toResponseDTO(user);
         auditService.registerMutation(

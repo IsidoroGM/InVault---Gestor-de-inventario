@@ -105,6 +105,7 @@ class UserServiceTests {
 
         assertEquals("new-hash", user.getPasswordHash());
         assertFalse(user.getMustChangePassword());
+        assertEquals(1L, user.getTokenVersion());
         verify(userRepository).save(user);
     }
 
