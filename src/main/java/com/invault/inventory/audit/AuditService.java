@@ -203,7 +203,12 @@ public class AuditService {
         if (size < 1 || size > 100) {
             throw new BadRequestException("Page size must be between 1 and 100.");
         }
-        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+                        .and(Sort.by(Sort.Direction.DESC, "id"))
+        );
     }
 
     private AuditLogResponseDTO toResponseDTO(AuditLog auditLog) {

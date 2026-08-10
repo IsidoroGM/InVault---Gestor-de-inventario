@@ -31,8 +31,10 @@ public class ProductController {
     }
 
     @GetMapping
-    public List<ProductResponseDTO> findAll() {
-        return productService.findAll();
+    public PageResponseDTO<ProductResponseDTO> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return productService.findAll(page, size);
     }
 
     @GetMapping("/active")

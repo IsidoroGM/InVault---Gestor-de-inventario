@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.invault.inventory.audit.AuditService;
@@ -42,6 +43,9 @@ class UserServiceTests {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Test
     void createNormalizesIdentityHashesPasswordAndRequiresItsChange() {
@@ -107,10 +111,18 @@ class UserServiceTests {
         assertFalse(user.getMustChangePassword());
         assertEquals(1L, user.getTokenVersion());
         verify(userRepository).save(user);
+        verify(eventPublisher).publishEvent(new com.invault.inventory.realtime.UserSessionsRevokedEvent(8L));
     }
 
     private UserService service() {
-        return new UserService(userRepository, roleRepository, passwordEncoder, new UserMapper(), auditService);
+        return new UserService(
+                userRepository,
+                roleRepository,
+                passwordEncoder,
+                new UserMapper(),
+                auditService,
+                eventPublisher
+        );
     }
 
     private User userWithId(Long id, String username, String hash) {

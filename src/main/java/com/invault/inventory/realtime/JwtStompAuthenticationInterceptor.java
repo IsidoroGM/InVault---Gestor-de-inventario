@@ -23,13 +23,16 @@ public class JwtStompAuthenticationInterceptor implements ChannelInterceptor {
 
     private final JwtDecoder jwtDecoder;
     private final JwtAuthenticationConverter authenticationConverter;
+    private final AuthenticatedWebSocketSessionRegistry sessionRegistry;
 
     public JwtStompAuthenticationInterceptor(
             JwtDecoder jwtDecoder,
-            JwtAuthenticationConverter authenticationConverter) {
+            JwtAuthenticationConverter authenticationConverter,
+            AuthenticatedWebSocketSessionRegistry sessionRegistry) {
 
         this.jwtDecoder = jwtDecoder;
         this.authenticationConverter = authenticationConverter;
+        this.sessionRegistry = sessionRegistry;
     }
 
     @Override
@@ -40,13 +43,24 @@ public class JwtStompAuthenticationInterceptor implements ChannelInterceptor {
         );
 
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
-            accessor.setUser(authenticate(accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION)));
+            AuthenticatedSession session = authenticate(
+                    accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION)
+            );
+            if (!StringUtils.hasText(accessor.getSessionId())) {
+                throw new BadCredentialsException("WebSocket session identifier is missing.");
+            }
+            accessor.setUser(session.authentication());
+            sessionRegistry.registerAuthentication(accessor.getSessionId(), session.userId());
+        } else if (accessor != null && StompCommand.DISCONNECT.equals(accessor.getCommand())) {
+            if (StringUtils.hasText(accessor.getSessionId())) {
+                sessionRegistry.remove(accessor.getSessionId());
+            }
         }
 
         return message;
     }
 
-    private AbstractAuthenticationToken authenticate(String authorizationHeader) {
+    private AuthenticatedSession authenticate(String authorizationHeader) {
         if (!StringUtils.hasText(authorizationHeader)
                 || !authorizationHeader.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
             throw new BadCredentialsException("A valid bearer token is required for WebSocket connections.");
@@ -69,10 +83,20 @@ public class JwtStompAuthenticationInterceptor implements ChannelInterceptor {
                 throw new BadCredentialsException("WebSocket authentication failed.");
             }
 
-            return authentication;
+            Object userIdClaim = jwt.getClaim("userId");
+            if (!(userIdClaim instanceof Number userId)) {
+                throw new BadCredentialsException("WebSocket authentication failed.");
+            }
+
+            return new AuthenticatedSession(authentication, userId.longValue());
         } catch (JwtException exception) {
             throw new BadCredentialsException("WebSocket authentication failed.", exception);
         }
+    }
+
+    private record AuthenticatedSession(
+            AbstractAuthenticationToken authentication,
+            Long userId) {
     }
 }
 

@@ -10,6 +10,9 @@ spring:
     # Production explicitly enables the versioned migrations below.
     enabled: false
 
+  jpa:
+    open-in-view: false
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -18,6 +21,8 @@ server:
   port: 8080
 
 invault:
+  cors:
+    allowed-origins: ${INVAULT_CORS_ALLOWED_ORIGINS:http://localhost:4200}
   realtime:
     allowed-origins: ${INVAULT_REALTIME_ALLOWED_ORIGINS:http://localhost:4200}
   security:

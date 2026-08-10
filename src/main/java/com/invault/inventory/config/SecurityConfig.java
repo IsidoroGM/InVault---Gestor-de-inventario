@@ -23,10 +23,12 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.invault.inventory.auth.ApiAccessDeniedHandler;
+import com.invault.inventory.auth.ApiAuthenticationEntryPoint;
 import com.invault.inventory.auth.InVaultUserDetailsService;
 import com.invault.inventory.auth.MandatoryPasswordChangeFilter;
+import com.invault.inventory.auth.SecurityErrorResponseWriter;
 
-import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 public class SecurityConfig {
@@ -40,10 +42,12 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter,
-            ObjectMapper objectMapper) throws Exception {
+            SecurityErrorResponseWriter errorResponseWriter,
+            ApiAuthenticationEntryPoint authenticationEntryPoint,
+            ApiAccessDeniedHandler accessDeniedHandler) throws Exception {
 
         MandatoryPasswordChangeFilter mandatoryPasswordChangeFilter =
-                new MandatoryPasswordChangeFilter(objectMapper);
+                new MandatoryPasswordChangeFilter(errorResponseWriter);
 
         return http
                 .cors(Customizer.withDefaults())
@@ -56,6 +60,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/health",
+                                "/actuator/health",
+                                "/actuator/health/**",
                                 "/api/auth/login",
                                 "/error",
                                 "/v3/api-docs/**",
@@ -117,7 +123,13 @@ public class SecurityConfig {
                         // New endpoints must receive an explicit rule before becoming accessible.
                         .anyRequest().denyAll()
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                )
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                 )
                 .addFilterAfter(

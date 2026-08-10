@@ -52,9 +52,8 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProductResponseDTO> findAll() {
-        List<Product> products = productRepository.findAllByOrderByNameAsc();
-        return productMapper.toResponseDTOList(products);
+    public PageResponseDTO<ProductResponseDTO> findAll(int page, int size) {
+        return search(null, null, page, size);
     }
 
     @Transactional(readOnly = true)
@@ -268,7 +267,12 @@ public class ProductService {
         if (size < 1 || size > 100) {
             throw new BadRequestException("Page size must be between 1 and 100.");
         }
-        return PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, sortProperty));
+        return PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.ASC, sortProperty)
+                        .and(Sort.by(Sort.Direction.ASC, "id"))
+        );
     }
 }
 

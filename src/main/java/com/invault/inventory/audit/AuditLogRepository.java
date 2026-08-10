@@ -2,6 +2,7 @@ package com.invault.inventory.audit;
 
 import com.invault.inventory.users.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Repository responsible for database operations related to AuditLog entities.
@@ -20,6 +22,10 @@ import java.util.List;
  */
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+
+    @Override
+    @EntityGraph(attributePaths = "user")
+    Optional<AuditLog> findById(Long id);
 
     // Returns all audit logs created by a specific user, ordered from newest to oldest.
     List<AuditLog> findByUserOrderByCreatedAtDesc(User user);
@@ -63,6 +69,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     // Returns the latest audit logs in the system.
     List<AuditLog> findTop50ByOrderByCreatedAtDesc();
 
+    @EntityGraph(attributePaths = "user")
     @Query("""
             select audit
             from AuditLog audit

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
@@ -16,14 +17,21 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // Busca un producto por SKU ignorando mayúsculas/minúsculas.
     Optional<Product> findBySkuIgnoreCase(String sku);
 
+    @Override
+    @EntityGraph(attributePaths = {"category", "location", "unit"})
+    Optional<Product> findById(Long id);
+
     // Devuelve solo productos activos ordenados por nombre.
+    @EntityGraph(attributePaths = {"category", "location", "unit"})
     List<Product> findByActiveTrueOrderByNameAsc();
 
     // Devuelve todos los productos ordenados por nombre.
+    @EntityGraph(attributePaths = {"category", "location", "unit"})
     List<Product> findAllByOrderByNameAsc();
 
     long countByActiveTrue();
 
+    @EntityGraph(attributePaths = {"category", "location", "unit"})
     @Query("""
             select product
             from Product product

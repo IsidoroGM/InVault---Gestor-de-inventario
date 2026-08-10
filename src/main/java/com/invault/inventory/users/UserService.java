@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.roles.Role;
 import com.invault.inventory.roles.RoleName;
 import com.invault.inventory.roles.RoleRepository;
+import com.invault.inventory.realtime.UserSessionsRevokedEvent;
 import com.invault.inventory.users.dto.PasswordChangeRequestDTO;
 import com.invault.inventory.users.dto.PasswordResetRequestDTO;
 import com.invault.inventory.users.dto.UserCreateRequestDTO;
@@ -32,19 +34,22 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final AuditService auditService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public UserService(
             UserRepository userRepository,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
             UserMapper userMapper,
-            AuditService auditService) {
+            AuditService auditService,
+            ApplicationEventPublisher eventPublisher) {
 
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.userMapper = userMapper;
         this.auditService = auditService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -96,6 +101,7 @@ public class UserService {
         UserResponseDTO after = userMapper.toResponseDTO(updatedUser);
         auditService.registerMutation(
                 AuditAction.UPDATED, "User", id, "User updated.", before, after);
+        publishSessionRevocation(id);
         return after;
     }
 
@@ -117,6 +123,7 @@ public class UserService {
         UserResponseDTO after = userMapper.toResponseDTO(user);
         auditService.registerMutation(
                 AuditAction.DEACTIVATED, "User", id, "User deactivated.", before, after);
+        publishSessionRevocation(id);
     }
 
     public void activate(Long id) {
@@ -132,6 +139,7 @@ public class UserService {
         UserResponseDTO after = userMapper.toResponseDTO(user);
         auditService.registerMutation(
                 AuditAction.ACTIVATED, "User", id, "User activated.", before, after);
+        publishSessionRevocation(id);
     }
 
     public void changeOwnPassword(Long authenticatedUserId, PasswordChangeRequestDTO requestDTO) {
@@ -158,6 +166,7 @@ public class UserService {
                 before,
                 after
         );
+        publishSessionRevocation(authenticatedUserId);
     }
 
     public void resetPassword(Long id, PasswordResetRequestDTO requestDTO) {
@@ -170,6 +179,11 @@ public class UserService {
         UserResponseDTO after = userMapper.toResponseDTO(user);
         auditService.registerMutation(
                 AuditAction.PASSWORD_RESET, "User", id, "User password reset.", before, after);
+        publishSessionRevocation(id);
+    }
+
+    private void publishSessionRevocation(Long userId) {
+        eventPublisher.publishEvent(new UserSessionsRevokedEvent(userId));
     }
 
     private User findUserById(Long id) {

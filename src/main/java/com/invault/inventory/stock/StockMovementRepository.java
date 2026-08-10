@@ -1,9 +1,11 @@
 package com.invault.inventory.stock;
 
 import java.util.List;
+import java.util.Optional;
 import java.time.LocalDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
@@ -14,13 +16,25 @@ import org.springframework.stereotype.Repository;
 public interface StockMovementRepository extends JpaRepository<StockMovement, Long> {
 
     // Devuelve los movimientos asociados a un producto concreto.
-    List<StockMovement> findByProductId(Long productId);
+    @EntityGraph(attributePaths = {"product", "batch", "user", "supplier"})
+    Page<StockMovement> findByProductId(Long productId, Pageable pageable);
 
     // Devuelve los movimientos asociados a un lote concreto.
-    List<StockMovement> findByBatchId(Long batchId);
+    @EntityGraph(attributePaths = {"product", "batch", "user", "supplier"})
+    Page<StockMovement> findByBatchId(Long batchId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"product", "batch", "user", "supplier"})
     List<StockMovement> findTop10ByOrderByMovementDateDesc();
 
+    @Override
+    @EntityGraph(attributePaths = {"product", "batch", "user", "supplier"})
+    Optional<StockMovement> findById(Long id);
+
+    @Override
+    @EntityGraph(attributePaths = {"product", "batch", "user", "supplier"})
+    Page<StockMovement> findAll(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"product", "batch", "user", "supplier"})
     @Query("""
             select movement
             from StockMovement movement

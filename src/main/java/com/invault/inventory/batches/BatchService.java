@@ -1,11 +1,12 @@
 package com.invault.inventory.batches;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 import com.invault.inventory.audit.AuditAction;
 import com.invault.inventory.audit.AuditService;
@@ -13,6 +14,7 @@ import com.invault.inventory.batches.dto.BatchRequestDTO;
 import com.invault.inventory.batches.dto.BatchResponseDTO;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
 
@@ -38,17 +40,24 @@ public class BatchService {
     }
 
     @Transactional(readOnly = true)
-    public List<BatchResponseDTO> findAll() {
-        List<Batch> batches = batchRepository.findAllByOrderByBatchCodeAsc();
-        return batchMapper.toResponseDTOList(batches);
+    public PageResponseDTO<BatchResponseDTO> findAll(int page, int size) {
+        Page<BatchResponseDTO> result = batchRepository
+                .findAllByOrderByBatchCodeAsc(pageRequest(page, size))
+                .map(batchMapper::toResponseDTO);
+        return PageResponseDTO.from(result);
     }
 
     @Transactional(readOnly = true)
-    public List<BatchResponseDTO> findByProductId(Long productId) {
+    public PageResponseDTO<BatchResponseDTO> findByProductId(
+            Long productId,
+            int page,
+            int size) {
         validateProductExists(productId);
 
-        List<Batch> batches = batchRepository.findByProductIdOrderByBatchCodeAsc(productId);
-        return batchMapper.toResponseDTOList(batches);
+        Page<BatchResponseDTO> result = batchRepository
+                .findByProductIdOrderByBatchCodeAsc(productId, pageRequest(page, size))
+                .map(batchMapper::toResponseDTO);
+        return PageResponseDTO.from(result);
     }
 
     @Transactional(readOnly = true)
@@ -210,6 +219,16 @@ public class BatchService {
 
     private String normalizeText(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private PageRequest pageRequest(int page, int size) {
+        if (page < 0) {
+            throw new BadRequestException("Page index cannot be negative.");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("Page size must be between 1 and 100.");
+        }
+        return PageRequest.of(page, size);
     }
 }
 
