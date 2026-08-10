@@ -1,6 +1,5 @@
 package com.invault.inventory.stock;
 
-import java.util.List;
 import java.time.LocalDateTime;
 
 import org.springframework.http.HttpStatus;
@@ -34,8 +33,10 @@ public class StockController {
     }
 
     @GetMapping
-    public List<StockMovementResponseDTO> findAll() {
-        return stockService.findAll();
+    public PageResponseDTO<StockMovementResponseDTO> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return stockService.findAll(page, size);
     }
 
     @GetMapping("/{id}")
@@ -59,13 +60,19 @@ public class StockController {
     }
 
     @GetMapping("/product/{productId}")
-    public List<StockMovementResponseDTO> findByProductId(@PathVariable Long productId) {
-        return stockService.findByProductId(productId);
+    public PageResponseDTO<StockMovementResponseDTO> findByProductId(
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return stockService.findByProductId(productId, page, size);
     }
 
     @GetMapping("/batch/{batchId}")
-    public List<StockMovementResponseDTO> findByBatchId(@PathVariable Long batchId) {
-        return stockService.findByBatchId(batchId);
+    public PageResponseDTO<StockMovementResponseDTO> findByBatchId(
+            @PathVariable Long batchId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return stockService.findByBatchId(batchId, page, size);
     }
 
     @PostMapping

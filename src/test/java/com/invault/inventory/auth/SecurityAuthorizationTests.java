@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -99,6 +100,10 @@ class SecurityAuthorizationTests {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"admin\",\"password\":\"secret-password\"}"))
@@ -120,7 +125,9 @@ class SecurityAuthorizationTests {
         when(unitService.findAll()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/units"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.path").value("/api/units"));
 
         mockMvc.perform(get("/api/units")
                         .header("Authorization", bearerToken("READ_ONLY")))
@@ -133,9 +140,11 @@ class SecurityAuthorizationTests {
 
         mockMvc.perform(post("/api/categories")
                         .header("Authorization", bearerToken("READ_ONLY"))
-                        .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.path").value("/api/categories"));
 
         mockMvc.perform(post("/api/categories")
                         .header("Authorization", bearerToken("WAREHOUSE"))
@@ -185,7 +194,38 @@ class SecurityAuthorizationTests {
     void invalidBearerTokenIsRejected() throws Exception {
         mockMvc.perform(get("/api/products")
                         .header("Authorization", "Bearer invalid-token"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message")
+                        .value("Authentication is required or the bearer token is invalid."));
+    }
+
+    @Test
+    void corsAllowsConfiguredFrontendAndRejectsOtherOrigins() throws Exception {
+        mockMvc.perform(options("/api/products")
+                        .header("Origin", "http://localhost:4200")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(result -> {
+                    String origin = result.getResponse().getHeader("Access-Control-Allow-Origin");
+                    org.assertj.core.api.Assertions.assertThat(origin)
+                            .isEqualTo("http://localhost:4200");
+                });
+
+        mockMvc.perform(options("/api/products")
+                        .header("Origin", "https://untrusted.example")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void invalidQueryParameterUsesTheApiErrorContract() throws Exception {
+        mockMvc.perform(get("/api/stock/movements/search")
+                        .queryParam("movementType", "UNKNOWN")
+                        .header("Authorization", bearerToken("READ_ONLY")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Request parameter is invalid."))
+                .andExpect(jsonPath("$.path").value("/api/stock/movements/search"));
     }
 
     @Test

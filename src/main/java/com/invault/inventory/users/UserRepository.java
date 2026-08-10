@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,6 +22,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *
      * This will be useful during login and user management.
      */
+    @EntityGraph(attributePaths = "roles")
     Optional<User> findByUsernameIgnoreCase(String username);
 
     /*
@@ -28,6 +30,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *
      * This can be useful for account recovery or user validation.
      */
+    @EntityGraph(attributePaths = "roles")
     Optional<User> findByEmailIgnoreCase(String email);
 
     /*
@@ -35,7 +38,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *
      * This will help prevent disabled users from authenticating.
      */
+    @EntityGraph(attributePaths = "roles")
     Optional<User> findByUsernameIgnoreCaseAndActiveTrue(String username);
+
+    @Override
+    @EntityGraph(attributePaths = "roles")
+    Optional<User> findById(Long id);
 
     /*
      * Checks if a username is already registered.
@@ -56,8 +64,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *
      * This will be useful in future administration screens.
      */
+    @EntityGraph(attributePaths = "roles")
     List<User> findAllByOrderByUsernameAsc();
 
+    @EntityGraph(attributePaths = "roles")
     List<User> findByActiveTrueOrderByUsernameAsc();
 
     @Query("""

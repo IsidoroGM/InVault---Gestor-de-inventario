@@ -1,7 +1,5 @@
 package com.invault.inventory.batches;
 
-import java.util.List;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,9 +9,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import com.invault.inventory.batches.dto.BatchRequestDTO;
 import com.invault.inventory.batches.dto.BatchResponseDTO;
+import com.invault.inventory.common.dto.PageResponseDTO;
 
 import jakarta.validation.Valid;
 
@@ -28,8 +28,10 @@ public class BatchController {
     }
 
     @GetMapping
-    public List<BatchResponseDTO> findAll() {
-        return batchService.findAll();
+    public PageResponseDTO<BatchResponseDTO> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return batchService.findAll(page, size);
     }
 
     @GetMapping("/{id}")
@@ -38,8 +40,11 @@ public class BatchController {
     }
 
     @GetMapping("/product/{productId}")
-    public List<BatchResponseDTO> findByProductId(@PathVariable Long productId) {
-        return batchService.findByProductId(productId);
+    public PageResponseDTO<BatchResponseDTO> findByProductId(
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return batchService.findByProductId(productId, page, size);
     }
 
     @PostMapping

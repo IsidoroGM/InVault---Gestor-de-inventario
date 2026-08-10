@@ -1,22 +1,16 @@
 package com.invault.inventory.auth;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.invault.inventory.common.exception.ApiErrorResponse;
-
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import tools.jackson.databind.ObjectMapper;
 
 public class MandatoryPasswordChangeFilter extends OncePerRequestFilter {
 
@@ -25,10 +19,10 @@ public class MandatoryPasswordChangeFilter extends OncePerRequestFilter {
     private static final String ERROR_MESSAGE =
             "Password change is required before accessing this resource.";
 
-    private final ObjectMapper objectMapper;
+    private final SecurityErrorResponseWriter errorResponseWriter;
 
-    public MandatoryPasswordChangeFilter(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public MandatoryPasswordChangeFilter(SecurityErrorResponseWriter errorResponseWriter) {
+        this.errorResponseWriter = errorResponseWriter;
     }
 
     @Override
@@ -62,16 +56,6 @@ public class MandatoryPasswordChangeFilter extends OncePerRequestFilter {
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
 
-        response.setStatus(HttpStatus.FORBIDDEN.value());
-        response.setCharacterEncoding("UTF-8");
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        ApiErrorResponse error = new ApiErrorResponse(
-                HttpStatus.FORBIDDEN.value(),
-                HttpStatus.FORBIDDEN.getReasonPhrase(),
-                ERROR_MESSAGE,
-                request.getRequestURI(),
-                LocalDateTime.now()
-        );
-        response.getWriter().write(objectMapper.writeValueAsString(error));
+        errorResponseWriter.write(request, response, HttpStatus.FORBIDDEN, ERROR_MESSAGE);
     }
 }

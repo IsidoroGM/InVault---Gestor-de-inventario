@@ -3,6 +3,7 @@ package com.invault.inventory.realtime;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -30,12 +31,18 @@ class JwtStompAuthenticationInterceptorTests {
     private JwtAuthenticationConverter authenticationConverter;
     private JwtStompAuthenticationInterceptor interceptor;
     private MessageChannel channel;
+    private AuthenticatedWebSocketSessionRegistry sessionRegistry;
 
     @BeforeEach
     void setUp() {
         jwtDecoder = mock(JwtDecoder.class);
         authenticationConverter = mock(JwtAuthenticationConverter.class);
-        interceptor = new JwtStompAuthenticationInterceptor(jwtDecoder, authenticationConverter);
+        sessionRegistry = mock(AuthenticatedWebSocketSessionRegistry.class);
+        interceptor = new JwtStompAuthenticationInterceptor(
+                jwtDecoder,
+                authenticationConverter,
+                sessionRegistry
+        );
         channel = mock(MessageChannel.class);
     }
 
@@ -58,6 +65,7 @@ class JwtStompAuthenticationInterceptorTests {
                 StompHeaderAccessor.class
         );
         assertSame(authentication, accessor.getUser());
+        verify(sessionRegistry).registerAuthentication("session-1", 99L);
     }
 
     @Test
@@ -88,6 +96,7 @@ class JwtStompAuthenticationInterceptorTests {
 
     private Message<byte[]> connectMessage(String authorizationHeader) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setSessionId("session-1");
         if (authorizationHeader != null) {
             accessor.setNativeHeader(HttpHeaders.AUTHORIZATION, authorizationHeader);
         }
@@ -102,6 +111,7 @@ class JwtStompAuthenticationInterceptorTests {
                 .subject("realtime-user")
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(300))
+                .claim("userId", 99L)
                 .claim("roles", List.of("READ_ONLY"))
                 .claim("mustChangePassword", mustChangePassword)
                 .build();

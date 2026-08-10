@@ -6,6 +6,9 @@ import java.util.Optional;
 import jakarta.persistence.LockModeType;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,13 +20,20 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
     // Busca un lote por código ignorando mayúsculas/minúsculas.
     Optional<Batch> findByBatchCodeIgnoreCase(String batchCode);
 
+    @Override
+    @EntityGraph(attributePaths = "product")
+    Optional<Batch> findById(Long id);
+
     // Devuelve todos los lotes ordenados por código.
-    List<Batch> findAllByOrderByBatchCodeAsc();
+    @EntityGraph(attributePaths = "product")
+    Page<Batch> findAllByOrderByBatchCodeAsc(Pageable pageable);
 
     // Devuelve los lotes de un producto concreto ordenados por código.
-    List<Batch> findByProductIdOrderByBatchCodeAsc(Long productId);
+    @EntityGraph(attributePaths = "product")
+    Page<Batch> findByProductIdOrderByBatchCodeAsc(Long productId, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "product")
     @Query("select batch from Batch batch where batch.id = :batchId")
     Optional<Batch> findByIdForUpdate(@Param("batchId") Long batchId);
 

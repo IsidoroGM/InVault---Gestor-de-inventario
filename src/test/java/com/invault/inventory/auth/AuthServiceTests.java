@@ -19,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -29,6 +30,7 @@ import com.invault.inventory.auth.JwtService.TokenDetails;
 import com.invault.inventory.auth.dto.LoginRequestDTO;
 import com.invault.inventory.auth.dto.LoginResponseDTO;
 import com.invault.inventory.common.exception.UnauthorizedException;
+import com.invault.inventory.realtime.UserSessionsRevokedEvent;
 import com.invault.inventory.users.User;
 import com.invault.inventory.users.UserRepository;
 
@@ -46,6 +48,9 @@ class AuthServiceTests {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private AuthService authService;
@@ -150,6 +155,7 @@ class AuthServiceTests {
                 any(),
                 any()
         );
+        verify(eventPublisher).publishEvent(new UserSessionsRevokedEvent(4L));
     }
 
     private Authentication anyAuthentication() {

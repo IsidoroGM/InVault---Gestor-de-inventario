@@ -2,8 +2,6 @@ package com.invault.inventory.stock;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -65,34 +63,37 @@ public class StockService {
     }
 
     @Transactional(readOnly = true)
-    public List<StockMovementResponseDTO> findAll() {
-        List<StockMovement> movements = stockMovementRepository.findAll();
-
-        return stockMovementMapper.toResponseDTOList(
-                orderByIdDescending(movements)
-        );
+    public PageResponseDTO<StockMovementResponseDTO> findAll(int page, int size) {
+        Page<StockMovementResponseDTO> result = stockMovementRepository
+                .findAll(pageRequest(page, size))
+                .map(stockMovementMapper::toResponseDTO);
+        return PageResponseDTO.from(result);
     }
 
     @Transactional(readOnly = true)
-    public List<StockMovementResponseDTO> findByProductId(Long productId) {
+    public PageResponseDTO<StockMovementResponseDTO> findByProductId(
+            Long productId,
+            int page,
+            int size) {
         validateProductExists(productId);
 
-        List<StockMovement> movements = stockMovementRepository.findByProductId(productId);
-
-        return stockMovementMapper.toResponseDTOList(
-                orderByIdDescending(movements)
-        );
+        Page<StockMovementResponseDTO> result = stockMovementRepository
+                .findByProductId(productId, pageRequest(page, size))
+                .map(stockMovementMapper::toResponseDTO);
+        return PageResponseDTO.from(result);
     }
 
     @Transactional(readOnly = true)
-    public List<StockMovementResponseDTO> findByBatchId(Long batchId) {
+    public PageResponseDTO<StockMovementResponseDTO> findByBatchId(
+            Long batchId,
+            int page,
+            int size) {
         validateBatchExists(batchId);
 
-        List<StockMovement> movements = stockMovementRepository.findByBatchId(batchId);
-
-        return stockMovementMapper.toResponseDTOList(
-                orderByIdDescending(movements)
-        );
+        Page<StockMovementResponseDTO> result = stockMovementRepository
+                .findByBatchId(batchId, pageRequest(page, size))
+                .map(stockMovementMapper::toResponseDTO);
+        return PageResponseDTO.from(result);
     }
 
     @Transactional(readOnly = true)
@@ -361,12 +362,6 @@ public class StockService {
         }
     }
 
-    private List<StockMovement> orderByIdDescending(List<StockMovement> movements) {
-        return movements.stream()
-                .sorted(Comparator.comparing(StockMovement::getId).reversed())
-                .toList();
-    }
-
     private String normalizeText(String value) {
         return value == null ? null : value.trim();
     }
@@ -378,7 +373,12 @@ public class StockService {
         if (size < 1 || size > 100) {
             throw new BadRequestException("Page size must be between 1 and 100.");
         }
-        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "movementDate"));
+        return PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "movementDate")
+                        .and(Sort.by(Sort.Direction.DESC, "id"))
+        );
     }
 
     private record BatchStockAuditSnapshot(

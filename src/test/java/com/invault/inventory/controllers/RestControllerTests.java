@@ -17,6 +17,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,6 +33,7 @@ import com.invault.inventory.categories.dto.CategoryRequestDTO;
 import com.invault.inventory.categories.dto.CategoryResponseDTO;
 import com.invault.inventory.common.exception.GlobalExceptionHandler;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.locations.LocationController;
 import com.invault.inventory.locations.LocationService;
 import com.invault.inventory.locations.dto.LocationRequestDTO;
@@ -94,25 +96,31 @@ class RestControllerTests {
         when(categoryService.findAll()).thenReturn(List.of());
         when(locationService.findAll()).thenReturn(List.of());
         when(supplierService.findAll()).thenReturn(List.of());
-        when(productService.findAll()).thenReturn(List.of());
-        when(batchService.findAll()).thenReturn(List.of());
-        when(stockService.findAll()).thenReturn(List.of());
+        when(productService.findAll(0, 25)).thenReturn(emptyPage());
+        when(batchService.findAll(0, 25)).thenReturn(emptyPage());
+        when(stockService.findAll(0, 25)).thenReturn(emptyPage());
 
         mockMvc.perform(get("/api/units")).andExpect(status().isOk());
         mockMvc.perform(get("/api/categories")).andExpect(status().isOk());
         mockMvc.perform(get("/api/locations")).andExpect(status().isOk());
         mockMvc.perform(get("/api/suppliers")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/products")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/batches")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/stock/movements")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+        mockMvc.perform(get("/api/batches"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+        mockMvc.perform(get("/api/stock/movements"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
 
         verify(unitService).findAll();
         verify(categoryService).findAll();
         verify(locationService).findAll();
         verify(supplierService).findAll();
-        verify(productService).findAll();
-        verify(batchService).findAll();
-        verify(stockService).findAll();
+        verify(productService).findAll(0, 25);
+        verify(batchService).findAll(0, 25);
+        verify(stockService).findAll(0, 25);
     }
 
     @Test
@@ -183,17 +191,17 @@ class RestControllerTests {
 
     @Test
     void filteredHistoryEndpointsDelegateTheirPathIdentifiers() throws Exception {
-        when(batchService.findByProductId(5L)).thenReturn(List.of());
-        when(stockService.findByProductId(5L)).thenReturn(List.of());
-        when(stockService.findByBatchId(8L)).thenReturn(List.of());
+        when(batchService.findByProductId(5L, 0, 25)).thenReturn(emptyPage());
+        when(stockService.findByProductId(5L, 0, 25)).thenReturn(emptyPage());
+        when(stockService.findByBatchId(8L, 0, 25)).thenReturn(emptyPage());
 
         mockMvc.perform(get("/api/batches/product/5")).andExpect(status().isOk());
         mockMvc.perform(get("/api/stock/movements/product/5")).andExpect(status().isOk());
         mockMvc.perform(get("/api/stock/movements/batch/8")).andExpect(status().isOk());
 
-        verify(batchService).findByProductId(5L);
-        verify(stockService).findByProductId(5L);
-        verify(stockService).findByBatchId(8L);
+        verify(batchService).findByProductId(5L, 0, 25);
+        verify(stockService).findByProductId(5L, 0, 25);
+        verify(stockService).findByBatchId(8L, 0, 25);
     }
 
     @Test
@@ -234,6 +242,20 @@ class RestControllerTests {
                 .andExpect(jsonPath("$.path").value("/api/products/99"));
     }
 
+    @Test
+    void databaseConstraintConflictReturnsConflictWithoutLeakingDetails() throws Exception {
+        when(categoryService.create(any(CategoryRequestDTO.class)))
+                .thenThrow(new DataIntegrityViolationException("database constraint details"));
+
+        mockMvc.perform(post("/api/categories")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Duplicate\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message")
+                        .value("The operation conflicts with existing data."));
+    }
+
     private void performPost(String path, String content) throws Exception {
         mockMvc.perform(post(path)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -259,6 +281,10 @@ class RestControllerTests {
                 .build();
 
         return new JwtAuthenticationToken(jwt);
+    }
+
+    private <T> PageResponseDTO<T> emptyPage() {
+        return new PageResponseDTO<>(List.of(), 0, 25, 0, 0, true, true);
     }
 }
 

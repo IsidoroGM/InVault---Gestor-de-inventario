@@ -19,8 +19,28 @@ spring:
     enabled: true
 
 invault:
+  cors:
+    allowed-origins: ${INVAULT_CORS_ALLOWED_ORIGINS}
   realtime:
     allowed-origins: ${INVAULT_REALTIME_ALLOWED_ORIGINS}
   security:
     jwt:
       secret: ${INVAULT_JWT_SECRET}
+
+server:
+  forward-headers-strategy: framework
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
