@@ -20,9 +20,15 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.invault.inventory.auth.ApiAccessDeniedHandler;
+import com.invault.inventory.auth.ApiAuthenticationEntryPoint;
 import com.invault.inventory.auth.InVaultUserDetailsService;
+import com.invault.inventory.auth.MandatoryPasswordChangeFilter;
+import com.invault.inventory.auth.SecurityErrorResponseWriter;
+
 
 @Configuration
 public class SecurityConfig {
@@ -35,7 +41,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            SecurityErrorResponseWriter errorResponseWriter,
+            ApiAuthenticationEntryPoint authenticationEntryPoint,
+            ApiAccessDeniedHandler accessDeniedHandler) throws Exception {
+
+        MandatoryPasswordChangeFilter mandatoryPasswordChangeFilter =
+                new MandatoryPasswordChangeFilter(errorResponseWriter);
 
         return http
                 .cors(Customizer.withDefaults())
@@ -46,9 +58,34 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/health", "/api/auth/login", "/error").permitAll()
+                        .requestMatchers(
+                                "/api/health",
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/api/auth/login",
+                                "/error",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**")
+                        .permitAll()
                         // The STOMP CONNECT frame performs JWT authentication.
                         .requestMatchers("/ws", "/ws/**").permitAll()
+
+                        // Every authenticated account can replace its own password.
+                        .requestMatchers(HttpMethod.PUT, "/api/users/me/password")
+                        .hasAnyRole(ADMIN, SUPERVISOR, WAREHOUSE, READ_ONLY)
+                        .requestMatchers(HttpMethod.POST, "/api/auth/logout")
+                        .hasAnyRole(ADMIN, SUPERVISOR, WAREHOUSE, READ_ONLY)
+
+                        // User and audit administration is limited to management roles.
+                        .requestMatchers(HttpMethod.GET, "/api/users/**", "/api/roles/**", "/api/audit-logs/**")
+                        .hasAnyRole(ADMIN, SUPERVISOR)
+                        .requestMatchers(HttpMethod.POST, "/api/users")
+                        .hasRole(ADMIN)
+                        .requestMatchers(HttpMethod.PUT, "/api/users/**")
+                        .hasRole(ADMIN)
+                        .requestMatchers(HttpMethod.PATCH, "/api/users/**")
+                        .hasRole(ADMIN)
 
                         // Every official role can consult inventory information.
                         .requestMatchers(HttpMethod.GET, "/api/**")
@@ -86,8 +123,18 @@ public class SecurityConfig {
                         // New endpoints must receive an explicit rule before becoming accessible.
                         .anyRequest().denyAll()
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                )
                 .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
+                )
+                .addFilterAfter(
+                        mandatoryPasswordChangeFilter,
+                        BearerTokenAuthenticationFilter.class
                 )
                 .build();
     }

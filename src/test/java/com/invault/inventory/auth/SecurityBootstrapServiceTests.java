@@ -62,8 +62,8 @@ class SecurityBootstrapServiceTests {
         );
         SecurityBootstrapService service = createService(properties);
 
-        when(userRepository.existsByUsername("initial.admin")).thenReturn(false);
-        when(userRepository.existsByEmail("admin@invault.local")).thenReturn(false);
+        when(userRepository.existsByUsernameIgnoreCase("initial.admin")).thenReturn(false);
+        when(userRepository.existsByEmailIgnoreCase("admin@invault.local")).thenReturn(false);
         when(passwordEncoder.encode("temporary-password")).thenReturn("bcrypt-hash");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User user = invocation.getArgument(0);
@@ -114,7 +114,7 @@ class SecurityBootstrapServiceTests {
         );
         SecurityBootstrapService service = createService(properties);
 
-        when(userRepository.existsByUsername("admin")).thenReturn(true);
+        when(userRepository.existsByUsernameIgnoreCase("admin")).thenReturn(true);
 
         service.initializeSecurityData();
 

@@ -2,10 +2,16 @@ package com.invault.inventory.audit;
 
 import com.invault.inventory.users.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Repository responsible for database operations related to AuditLog entities.
@@ -16,6 +22,10 @@ import java.util.List;
  */
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+
+    @Override
+    @EntityGraph(attributePaths = "user")
+    Optional<AuditLog> findById(Long id);
 
     // Returns all audit logs created by a specific user, ordered from newest to oldest.
     List<AuditLog> findByUserOrderByCreatedAtDesc(User user);
@@ -58,6 +68,26 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
     // Returns the latest audit logs in the system.
     List<AuditLog> findTop50ByOrderByCreatedAtDesc();
+
+    @EntityGraph(attributePaths = "user")
+    @Query("""
+            select audit
+            from AuditLog audit
+            where (:action is null or audit.action = :action)
+              and (:entityName is null
+                   or lower(audit.entityName) like lower(concat('%', :entityName, '%')))
+              and (:userId is null or audit.user.id = :userId)
+              and (:fromDate is null or audit.createdAt >= :fromDate)
+              and (:toDate is null or audit.createdAt <= :toDate)
+            """)
+    Page<AuditLog> search(
+            @Param("action") AuditAction action,
+            @Param("entityName") String entityName,
+            @Param("userId") Long userId,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate,
+            Pageable pageable
+    );
 }
 
 /*

@@ -5,8 +5,10 @@ import java.util.List;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.invault.inventory.audit.AuditAction;
 import com.invault.inventory.audit.AuditService;
@@ -14,6 +16,7 @@ import com.invault.inventory.auth.JwtService.TokenDetails;
 import com.invault.inventory.auth.dto.LoginRequestDTO;
 import com.invault.inventory.auth.dto.LoginResponseDTO;
 import com.invault.inventory.common.exception.UnauthorizedException;
+import com.invault.inventory.realtime.UserSessionsRevokedEvent;
 import com.invault.inventory.users.User;
 import com.invault.inventory.users.UserRepository;
 
@@ -26,17 +29,20 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final AuditService auditService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AuthService(
             AuthenticationManager authenticationManager,
             UserRepository userRepository,
             JwtService jwtService,
-            AuditService auditService) {
+            AuditService auditService,
+            ApplicationEventPublisher eventPublisher) {
 
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.auditService = auditService;
+        this.eventPublisher = eventPublisher;
     }
 
     public LoginResponseDTO login(LoginRequestDTO requestDTO, String clientIp) {
@@ -58,7 +64,7 @@ public class AuthService {
             throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
         }
 
-        User user = userRepository.findByUsernameAndActiveTrue(username)
+        User user = userRepository.findByUsernameIgnoreCaseAndActiveTrue(username)
                 .orElseThrow(() -> new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE));
 
         List<String> roles = jwtService.activeRoleNames(user);
@@ -100,6 +106,28 @@ public class AuthService {
                 roles,
                 Boolean.TRUE.equals(user.getMustChangePassword())
         );
+    }
+
+    @Transactional
+    public void logout(Long authenticatedUserId) {
+        User user = userRepository.findById(authenticatedUserId)
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user is no longer available."));
+        long previousVersion = user.getTokenVersion();
+        long currentVersion = user.revokeActiveTokens();
+        userRepository.save(user);
+
+        auditService.registerMutation(
+                AuditAction.LOGOUT,
+                "User",
+                authenticatedUserId,
+                "User logged out and revoked active tokens.",
+                new SessionVersionAuditSnapshot(authenticatedUserId, previousVersion),
+                new SessionVersionAuditSnapshot(authenticatedUserId, currentVersion)
+        );
+        eventPublisher.publishEvent(new UserSessionsRevokedEvent(authenticatedUserId));
+    }
+
+    private record SessionVersionAuditSnapshot(Long userId, long tokenVersion) {
     }
 }
 

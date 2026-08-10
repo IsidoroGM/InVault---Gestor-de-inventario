@@ -1,6 +1,6 @@
 package com.invault.inventory.stock;
 
-import java.util.List;
+import java.time.LocalDateTime;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -12,7 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.common.exception.UnauthorizedException;
@@ -30,8 +33,10 @@ public class StockController {
     }
 
     @GetMapping
-    public List<StockMovementResponseDTO> findAll() {
-        return stockService.findAll();
+    public PageResponseDTO<StockMovementResponseDTO> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return stockService.findAll(page, size);
     }
 
     @GetMapping("/{id}")
@@ -39,14 +44,35 @@ public class StockController {
         return stockService.findById(id);
     }
 
+    @GetMapping("/search")
+    public PageResponseDTO<StockMovementResponseDTO> search(
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) Long batchId,
+            @RequestParam(required = false) MovementType movementType,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+
+        return stockService.search(productId, batchId, movementType, from, to, page, size);
+    }
+
     @GetMapping("/product/{productId}")
-    public List<StockMovementResponseDTO> findByProductId(@PathVariable Long productId) {
-        return stockService.findByProductId(productId);
+    public PageResponseDTO<StockMovementResponseDTO> findByProductId(
+            @PathVariable Long productId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return stockService.findByProductId(productId, page, size);
     }
 
     @GetMapping("/batch/{batchId}")
-    public List<StockMovementResponseDTO> findByBatchId(@PathVariable Long batchId) {
-        return stockService.findByBatchId(batchId);
+    public PageResponseDTO<StockMovementResponseDTO> findByBatchId(
+            @PathVariable Long batchId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return stockService.findByBatchId(batchId, page, size);
     }
 
     @PostMapping

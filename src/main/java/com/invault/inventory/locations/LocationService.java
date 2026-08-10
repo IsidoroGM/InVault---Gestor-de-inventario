@@ -5,6 +5,8 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.locations.dto.LocationRequestDTO;
@@ -16,10 +18,15 @@ public class LocationService {
 
     private final LocationRepository locationRepository;
     private final LocationMapper locationMapper;
+    private final AuditService auditService;
 
-    public LocationService(LocationRepository locationRepository, LocationMapper locationMapper) {
+    public LocationService(
+            LocationRepository locationRepository,
+            LocationMapper locationMapper,
+            AuditService auditService) {
         this.locationRepository = locationRepository;
         this.locationMapper = locationMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -56,11 +63,15 @@ public class LocationService {
         }
 
         Location savedLocation = locationRepository.save(location);
-        return locationMapper.toResponseDTO(savedLocation);
+        LocationResponseDTO response = locationMapper.toResponseDTO(savedLocation);
+        auditService.registerMutation(
+                AuditAction.CREATED, "Location", response.getId(), "Location created.", null, response);
+        return response;
     }
 
     public LocationResponseDTO update(Long id, LocationRequestDTO requestDTO) {
         Location location = findLocationEntityById(id);
+        LocationResponseDTO before = locationMapper.toResponseDTO(location);
 
         String normalizedName = normalizeText(requestDTO.getName());
 
@@ -75,11 +86,16 @@ public class LocationService {
         }
 
         Location updatedLocation = locationRepository.save(location);
-        return locationMapper.toResponseDTO(updatedLocation);
+        LocationResponseDTO after = locationMapper.toResponseDTO(updatedLocation);
+        auditService.registerMutation(
+                AuditAction.fromActiveChange(before.isActive(), after.isActive()),
+                "Location", after.getId(), "Location updated.", before, after);
+        return after;
     }
 
     public void deactivate(Long id) {
         Location location = findLocationEntityById(id);
+        LocationResponseDTO before = locationMapper.toResponseDTO(location);
 
         if (Boolean.FALSE.equals(location.getActive())) {
             throw new BadRequestException("Location is already inactive.");
@@ -87,6 +103,9 @@ public class LocationService {
 
         location.setActive(false);
         locationRepository.save(location);
+        LocationResponseDTO after = locationMapper.toResponseDTO(location);
+        auditService.registerMutation(
+                AuditAction.DEACTIVATED, "Location", id, "Location deactivated.", before, after);
     }
 
     private Location findLocationEntityById(Long id) {

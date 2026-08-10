@@ -4,14 +4,24 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 
 /**
  * Centralized exception handler for the whole REST API.
@@ -19,6 +29,8 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
      * Returns a generic authentication error without identifying which credential failed.
@@ -84,6 +96,56 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(response);
     }
 
+    @ExceptionHandler({
+            MethodArgumentTypeMismatchException.class,
+            MissingServletRequestParameterException.class,
+            HandlerMethodValidationException.class,
+            ConstraintViolationException.class
+    })
+    public ResponseEntity<ApiErrorResponse> handleInvalidRequestParameter(
+            Exception exception,
+            HttpServletRequest request) {
+
+        return errorResponse(
+                HttpStatus.BAD_REQUEST,
+                "Request parameter is invalid.",
+                request
+        );
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataConflict(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request) {
+
+        return errorResponse(
+                HttpStatus.CONFLICT,
+                "The operation conflicts with existing data.",
+                request
+        );
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNoResourceFound(
+            NoResourceFoundException exception,
+            HttpServletRequest request) {
+        return errorResponse(HttpStatus.NOT_FOUND, "Resource not found.", request);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiErrorResponse> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException exception,
+            HttpServletRequest request) {
+        return errorResponse(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method is not supported.", request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiErrorResponse> handleMediaTypeNotSupported(
+            HttpMediaTypeNotSupportedException exception,
+            HttpServletRequest request) {
+        return errorResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Media type is not supported.", request);
+    }
+
     /**
      * Handles errors when a resource does not exist.
      * Example: requesting a product ID that is not in the database.
@@ -133,15 +195,27 @@ public class GlobalExceptionHandler {
             Exception exception,
             HttpServletRequest request
     ) {
+        LOGGER.error("Unhandled error for {}", request.getRequestURI(), exception);
+        return errorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "An unexpected error occurred.",
+                request
+        );
+    }
+
+    private ResponseEntity<ApiErrorResponse> errorResponse(
+            HttpStatus status,
+            String message,
+            HttpServletRequest request) {
+
         ApiErrorResponse response = new ApiErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
-                "An unexpected error occurred",
+                status.value(),
+                status.getReasonPhrase(),
+                message,
                 request.getRequestURI(),
                 LocalDateTime.now()
         );
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        return ResponseEntity.status(status).body(response);
     }
 }
 

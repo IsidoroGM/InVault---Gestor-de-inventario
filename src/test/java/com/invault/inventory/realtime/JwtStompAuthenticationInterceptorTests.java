@@ -3,6 +3,7 @@ package com.invault.inventory.realtime;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -30,18 +31,24 @@ class JwtStompAuthenticationInterceptorTests {
     private JwtAuthenticationConverter authenticationConverter;
     private JwtStompAuthenticationInterceptor interceptor;
     private MessageChannel channel;
+    private AuthenticatedWebSocketSessionRegistry sessionRegistry;
 
     @BeforeEach
     void setUp() {
         jwtDecoder = mock(JwtDecoder.class);
         authenticationConverter = mock(JwtAuthenticationConverter.class);
-        interceptor = new JwtStompAuthenticationInterceptor(jwtDecoder, authenticationConverter);
+        sessionRegistry = mock(AuthenticatedWebSocketSessionRegistry.class);
+        interceptor = new JwtStompAuthenticationInterceptor(
+                jwtDecoder,
+                authenticationConverter,
+                sessionRegistry
+        );
         channel = mock(MessageChannel.class);
     }
 
     @Test
     void connectAuthenticatesBearerTokenAndStoresPrincipal() {
-        Jwt jwt = testJwt();
+        Jwt jwt = testJwt(false);
         JwtAuthenticationToken authentication = new JwtAuthenticationToken(
                 jwt,
                 List.of(new SimpleGrantedAuthority("ROLE_READ_ONLY"))
@@ -58,6 +65,7 @@ class JwtStompAuthenticationInterceptorTests {
                 StompHeaderAccessor.class
         );
         assertSame(authentication, accessor.getUser());
+        verify(sessionRegistry).registerAuthentication("session-1", 99L);
     }
 
     @Test
@@ -75,8 +83,20 @@ class JwtStompAuthenticationInterceptorTests {
         );
     }
 
+    @Test
+    void connectRejectsSessionThatRequiresPasswordChange() {
+        Jwt jwt = testJwt(true);
+        when(jwtDecoder.decode("signed-token")).thenReturn(jwt);
+
+        assertThrows(
+                BadCredentialsException.class,
+                () -> interceptor.preSend(connectMessage("Bearer signed-token"), channel)
+        );
+    }
+
     private Message<byte[]> connectMessage(String authorizationHeader) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setSessionId("session-1");
         if (authorizationHeader != null) {
             accessor.setNativeHeader(HttpHeaders.AUTHORIZATION, authorizationHeader);
         }
@@ -84,14 +104,16 @@ class JwtStompAuthenticationInterceptorTests {
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
 
-    private Jwt testJwt() {
+    private Jwt testJwt(boolean mustChangePassword) {
         Instant now = Instant.now();
         return Jwt.withTokenValue("signed-token")
                 .header("alg", "HS256")
                 .subject("realtime-user")
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(300))
+                .claim("userId", 99L)
                 .claim("roles", List.of("READ_ONLY"))
+                .claim("mustChangePassword", mustChangePassword)
                 .build();
     }
 }

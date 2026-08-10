@@ -1,16 +1,20 @@
 package com.invault.inventory.batches;
 
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
+import com.invault.inventory.audit.AuditAction;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.batches.dto.BatchRequestDTO;
 import com.invault.inventory.batches.dto.BatchResponseDTO;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
 
@@ -21,29 +25,39 @@ public class BatchService {
     private final BatchRepository batchRepository;
     private final ProductRepository productRepository;
     private final BatchMapper batchMapper;
+    private final AuditService auditService;
 
     public BatchService(
             BatchRepository batchRepository,
             ProductRepository productRepository,
-            BatchMapper batchMapper) {
+            BatchMapper batchMapper,
+            AuditService auditService) {
 
         this.batchRepository = batchRepository;
         this.productRepository = productRepository;
         this.batchMapper = batchMapper;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
-    public List<BatchResponseDTO> findAll() {
-        List<Batch> batches = batchRepository.findAllByOrderByBatchCodeAsc();
-        return batchMapper.toResponseDTOList(batches);
+    public PageResponseDTO<BatchResponseDTO> findAll(int page, int size) {
+        Page<BatchResponseDTO> result = batchRepository
+                .findAllByOrderByBatchCodeAsc(pageRequest(page, size))
+                .map(batchMapper::toResponseDTO);
+        return PageResponseDTO.from(result);
     }
 
     @Transactional(readOnly = true)
-    public List<BatchResponseDTO> findByProductId(Long productId) {
+    public PageResponseDTO<BatchResponseDTO> findByProductId(
+            Long productId,
+            int page,
+            int size) {
         validateProductExists(productId);
 
-        List<Batch> batches = batchRepository.findByProductIdOrderByBatchCodeAsc(productId);
-        return batchMapper.toResponseDTOList(batches);
+        Page<BatchResponseDTO> result = batchRepository
+                .findByProductIdOrderByBatchCodeAsc(productId, pageRequest(page, size))
+                .map(batchMapper::toResponseDTO);
+        return PageResponseDTO.from(result);
     }
 
     @Transactional(readOnly = true)
@@ -67,15 +81,20 @@ public class BatchService {
         // Normalizamos los campos principales antes de guardar.
         batch.setBatchCode(normalizedBatchCode);
         batch.setQuantity(BigDecimal.ZERO);
+        validateNewBatchStatus(requestDTO.getStatus());
         batch.setStatus(requestDTO.getStatus());
         batch.setNotes(normalizeText(requestDTO.getNotes()));
 
         Batch savedBatch = batchRepository.save(batch);
-        return batchMapper.toResponseDTO(savedBatch);
+        BatchResponseDTO response = batchMapper.toResponseDTO(savedBatch);
+        auditService.registerMutation(
+                AuditAction.CREATED, "Batch", response.getId(), "Batch created.", null, response);
+        return response;
     }
 
     public BatchResponseDTO update(Long id, BatchRequestDTO requestDTO) {
-        Batch batch = findBatchEntityById(id);
+        Batch batch = findBatchEntityForUpdate(id);
+        BatchResponseDTO before = batchMapper.toResponseDTO(batch);
         Product product = findActiveProductById(requestDTO.getProductId());
 
         String normalizedBatchCode = normalizeBatchCode(requestDTO.getBatchCode());
@@ -89,17 +108,26 @@ public class BatchService {
 
         // Un estado omitido conserva el valor actual y evita reactivar el lote.
         if (requestDTO.getStatus() != null) {
+            validateStatusTransition(batch, requestDTO.getStatus());
             batch.setStatus(requestDTO.getStatus());
         }
 
         // La cantidad existente se conserva. Solo StockService puede modificarla.
 
         Batch updatedBatch = batchRepository.save(batch);
-        return batchMapper.toResponseDTO(updatedBatch);
+        BatchResponseDTO after = batchMapper.toResponseDTO(updatedBatch);
+        auditService.registerMutation(
+                AuditAction.UPDATED, "Batch", after.getId(), "Batch updated.", before, after);
+        return after;
     }
 
     private Batch findBatchEntityById(Long id) {
         return batchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + id));
+    }
+
+    private Batch findBatchEntityForUpdate(Long id) {
+        return batchRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch not found with id: " + id));
     }
 
@@ -140,6 +168,45 @@ public class BatchService {
         return currentBatchId == null || !existingBatch.getId().equals(currentBatchId);
     }
 
+    private void validateStatusTransition(Batch batch, BatchStatus requestedStatus) {
+        BatchStatus currentStatus = batch.getStatus();
+        if (currentStatus == requestedStatus) {
+            return;
+        }
+
+        if (requestedStatus == BatchStatus.CONSUMED) {
+            throw new BadRequestException(
+                    "A batch becomes consumed only when a stock movement reduces its quantity to zero.");
+        }
+
+        if (currentStatus == BatchStatus.CONSUMED && requestedStatus == BatchStatus.AVAILABLE) {
+            throw new BadRequestException(
+                    "A consumed batch becomes available only through an inbound or positive adjustment movement.");
+        }
+
+        boolean allowed = switch (currentStatus) {
+            case AVAILABLE -> requestedStatus == BatchStatus.BLOCKED
+                    || requestedStatus == BatchStatus.INACTIVE;
+            case BLOCKED -> requestedStatus == BatchStatus.AVAILABLE
+                    || requestedStatus == BatchStatus.INACTIVE;
+            case CONSUMED -> requestedStatus == BatchStatus.INACTIVE;
+            case INACTIVE -> requestedStatus == BatchStatus.AVAILABLE
+                    || requestedStatus == BatchStatus.BLOCKED;
+        };
+
+        if (!allowed) {
+            throw new BadRequestException(
+                    "Batch status transition from " + currentStatus + " to " + requestedStatus + " is not allowed.");
+        }
+    }
+
+    private void validateNewBatchStatus(BatchStatus requestedStatus) {
+        if (requestedStatus == BatchStatus.CONSUMED) {
+            throw new BadRequestException(
+                    "A new batch cannot start as consumed because it has no stock movement history.");
+        }
+    }
+
     private String normalizeBatchCode(String value) {
         String normalizedValue = normalizeText(value);
 
@@ -152,6 +219,16 @@ public class BatchService {
 
     private String normalizeText(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private PageRequest pageRequest(int page, int size) {
+        if (page < 0) {
+            throw new BadRequestException("Page index cannot be negative.");
+        }
+        if (size < 1 || size > 100) {
+            throw new BadRequestException("Page size must be between 1 and 100.");
+        }
+        return PageRequest.of(page, size);
     }
 }
 

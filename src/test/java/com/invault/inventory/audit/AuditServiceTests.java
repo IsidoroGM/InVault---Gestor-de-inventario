@@ -10,18 +10,37 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
+import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.Map;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import com.invault.inventory.audit.dto.AuditLogResponseDTO;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.users.User;
 import com.invault.inventory.users.UserRepository;
+
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class AuditServiceTests {
@@ -32,8 +51,17 @@ class AuditServiceTests {
     @Mock
     private UserRepository userRepository;
 
+    @Spy
+    private ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
+
     @InjectMocks
     private AuditService auditService;
+
+    @AfterEach
+    void clearContexts() {
+        SecurityContextHolder.clearContext();
+        RequestContextHolder.resetRequestAttributes();
+    }
 
     @Test
     void registerUserActionSavesNormalizedAuditLog() {
@@ -78,6 +106,32 @@ class AuditServiceTests {
         assertEquals("Invalid credentials", savedAuditLog.getDetails());
         assertNull(savedAuditLog.getClientIp());
         verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void registerMutationCapturesAuthenticatedActorIpAndSnapshots() {
+        User user = new User();
+        when(userRepository.findById(12L)).thenReturn(Optional.of(user));
+        authenticate(12L);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("10.0.0.8");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+        auditService.registerMutation(
+                AuditAction.UPDATED,
+                "Product",
+                34L,
+                "Product updated.",
+                Map.of("name", "Old product"),
+                Map.of("name", "New product")
+        );
+
+        AuditLog savedAuditLog = captureSavedAuditLog();
+        assertSame(user, savedAuditLog.getUser());
+        assertEquals(34L, savedAuditLog.getEntityId());
+        assertEquals("{\"name\":\"Old product\"}", savedAuditLog.getBeforeData());
+        assertEquals("{\"name\":\"New product\"}", savedAuditLog.getAfterData());
+        assertEquals("10.0.0.8", savedAuditLog.getClientIp());
     }
 
     @Test
@@ -169,10 +223,63 @@ class AuditServiceTests {
         verify(auditLogRepository, never()).save(org.mockito.ArgumentMatchers.any(AuditLog.class));
     }
 
+    @Test
+    void searchReturnsAStablePagedAuditContract() {
+        User user = new User("operator", "operator@example.com", "hash");
+        ReflectionTestUtils.setField(user, "id", 12L);
+        AuditLog auditLog = new AuditLog(
+                user,
+                AuditAction.UPDATED,
+                "Product",
+                34L,
+                "Product data updated",
+                "192.168.1.20"
+        );
+        LocalDateTime createdAt = LocalDateTime.of(2026, 8, 6, 12, 0);
+        ReflectionTestUtils.setField(auditLog, "id", 50L);
+        ReflectionTestUtils.setField(auditLog, "createdAt", createdAt);
+
+        when(auditLogRepository.search(
+                org.mockito.ArgumentMatchers.eq(AuditAction.UPDATED),
+                org.mockito.ArgumentMatchers.eq("Product"),
+                org.mockito.ArgumentMatchers.eq(12L),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.any(Pageable.class)
+        )).thenReturn(new PageImpl<>(java.util.List.of(auditLog)));
+
+        PageResponseDTO<AuditLogResponseDTO> result = auditService.search(
+                AuditAction.UPDATED,
+                "  Product  ",
+                12L,
+                null,
+                null,
+                0,
+                25
+        );
+
+        assertEquals(1, result.totalElements());
+        assertEquals(50L, result.content().getFirst().id());
+        assertEquals("operator", result.content().getFirst().username());
+        assertEquals(createdAt, result.content().getFirst().createdAt());
+    }
+
     private AuditLog captureSavedAuditLog() {
         ArgumentCaptor<AuditLog> auditLogCaptor = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(auditLogCaptor.capture());
         return auditLogCaptor.getValue();
+    }
+
+    private void authenticate(Long userId) {
+        Instant now = Instant.now();
+        Jwt jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "none")
+                .subject("audit-user")
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(300))
+                .claim("userId", userId)
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
     }
 }
 

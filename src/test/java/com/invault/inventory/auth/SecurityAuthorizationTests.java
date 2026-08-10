@@ -1,11 +1,15 @@
 package com.invault.inventory.auth;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -22,19 +27,23 @@ import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.invault.inventory.auth.dto.LoginRequestDTO;
 import com.invault.inventory.auth.dto.LoginResponseDTO;
+import com.invault.inventory.audit.AuditService;
 import com.invault.inventory.categories.CategoryService;
 import com.invault.inventory.categories.dto.CategoryRequestDTO;
 import com.invault.inventory.categories.dto.CategoryResponseDTO;
+import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.stock.StockService;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.units.UnitService;
+import com.invault.inventory.users.UserService;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -59,6 +68,21 @@ class SecurityAuthorizationTests {
     @MockitoBean
     private StockService stockService;
 
+    @MockitoBean
+    private UserService userService;
+
+    @MockitoBean
+    private AuditService auditService;
+
+    @MockitoBean
+    private UserSessionTokenValidator userSessionTokenValidator;
+
+    @BeforeEach
+    void allowSignedTestSessions() {
+        when(userSessionTokenValidator.validate(any()))
+                .thenReturn(OAuth2TokenValidatorResult.success());
+    }
+
     @Test
     void loginAndHealthRemainPublic() throws Exception {
         LoginResponseDTO response = new LoginResponseDTO(
@@ -76,6 +100,10 @@ class SecurityAuthorizationTests {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"admin\",\"password\":\"secret-password\"}"))
@@ -85,11 +113,21 @@ class SecurityAuthorizationTests {
     }
 
     @Test
+    void openApiDocumentationRemainsPublicAndDescribesInVault() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("InVault API"))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"));
+    }
+
+    @Test
     void inventoryReadsRequireAnyOfficialRole() throws Exception {
         when(unitService.findAll()).thenReturn(List.of());
 
         mockMvc.perform(get("/api/units"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.path").value("/api/units"));
 
         mockMvc.perform(get("/api/units")
                         .header("Authorization", bearerToken("READ_ONLY")))
@@ -102,9 +140,11 @@ class SecurityAuthorizationTests {
 
         mockMvc.perform(post("/api/categories")
                         .header("Authorization", bearerToken("READ_ONLY"))
-                        .contentType(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.path").value("/api/categories"));
 
         mockMvc.perform(post("/api/categories")
                         .header("Authorization", bearerToken("WAREHOUSE"))
@@ -154,10 +194,92 @@ class SecurityAuthorizationTests {
     void invalidBearerTokenIsRejected() throws Exception {
         mockMvc.perform(get("/api/products")
                         .header("Authorization", "Bearer invalid-token"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message")
+                        .value("Authentication is required or the bearer token is invalid."));
+    }
+
+    @Test
+    void corsAllowsConfiguredFrontendAndRejectsOtherOrigins() throws Exception {
+        mockMvc.perform(options("/api/products")
+                        .header("Origin", "http://localhost:4200")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(result -> {
+                    String origin = result.getResponse().getHeader("Access-Control-Allow-Origin");
+                    org.assertj.core.api.Assertions.assertThat(origin)
+                            .isEqualTo("http://localhost:4200");
+                });
+
+        mockMvc.perform(options("/api/products")
+                        .header("Origin", "https://untrusted.example")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void invalidQueryParameterUsesTheApiErrorContract() throws Exception {
+        mockMvc.perform(get("/api/stock/movements/search")
+                        .queryParam("movementType", "UNKNOWN")
+                        .header("Authorization", bearerToken("READ_ONLY")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Request parameter is invalid."))
+                .andExpect(jsonPath("$.path").value("/api/stock/movements/search"));
+    }
+
+    @Test
+    void userAndAuditQueriesAreRestrictedToManagementRoles() throws Exception {
+        when(userService.findAll()).thenReturn(List.of());
+        when(auditService.search(any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageResponseDTO<>(List.of(), 0, 25, 0, 0, true, true));
+
+        mockMvc.perform(get("/api/users")
+                        .header("Authorization", bearerToken("READ_ONLY")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/audit-logs")
+                        .header("Authorization", bearerToken("WAREHOUSE")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/users")
+                        .header("Authorization", bearerToken("SUPERVISOR")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/audit-logs")
+                        .header("Authorization", bearerToken("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void mandatoryPasswordChangeBlocksOtherResourcesButAllowsPasswordAndLogout() throws Exception {
+        String restrictedToken = bearerToken("WAREHOUSE", true);
+
+        mockMvc.perform(get("/api/units")
+                        .header("Authorization", restrictedToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("Password change is required before accessing this resource."));
+
+        mockMvc.perform(put("/api/users/me/password")
+                        .header("Authorization", restrictedToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"Current-1234\",\"newPassword\":\"New-password-123\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", restrictedToken))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout(99L);
     }
 
     private String bearerToken(String role) {
+        return bearerToken(role, false);
+    }
+
+    private String bearerToken(String role, boolean mustChangePassword) {
         Instant issuedAt = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("https://api.invault.local")
@@ -166,7 +288,8 @@ class SecurityAuthorizationTests {
                 .subject("security-test-user")
                 .claim("userId", 99L)
                 .claim("roles", List.of(role))
-                .claim("mustChangePassword", false)
+                .claim("mustChangePassword", mustChangePassword)
+                .claim("tokenVersion", 0L)
                 .build();
 
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
