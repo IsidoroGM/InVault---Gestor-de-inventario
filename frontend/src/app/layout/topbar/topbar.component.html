@@ -1,0 +1,22 @@
+<mat-toolbar>
+  @if (compact()) {
+    <button mat-icon-button type="button" aria-label="Abrir navegación" (click)="menuToggle.emit()">
+      <span class="menu-glyph" aria-hidden="true">☰</span>
+    </button>
+  }
+
+  <div class="title-group">
+    <span class="title">Panel de inventario</span>
+    <span class="subtitle">Entorno de desarrollo</span>
+  </div>
+
+  <span class="spacer"></span>
+
+  <div class="profile" aria-label="Sesión aún no implementada">
+    <span class="avatar" aria-hidden="true">IV</span>
+    <span class="profile-copy">
+      <strong>Sin sesión</strong>
+      <small>Autenticación: próxima subfase</small>
+    </span>
+  </div>
+</mat-toolbar>

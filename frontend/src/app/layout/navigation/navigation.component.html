@@ -1,0 +1,28 @@
+<div class="brand" aria-label="InVault">
+  <span class="brand-mark" aria-hidden="true">IV</span>
+  <span>
+    <strong>InVault</strong>
+    <small>Gestión de inventario</small>
+  </span>
+</div>
+
+<nav aria-label="Navegación principal">
+  <mat-nav-list>
+    @for (item of items; track item.route) {
+      <a
+        mat-list-item
+        [routerLink]="item.route"
+        routerLinkActive="active"
+        (click)="navigated.emit()"
+      >
+        <span class="nav-marker" aria-hidden="true">{{ item.marker }}</span>
+        <span class="nav-label">{{ item.label }}</span>
+      </a>
+    }
+  </mat-nav-list>
+</nav>
+
+<div class="sidebar-note">
+  <span class="status-dot" aria-hidden="true"></span>
+  Base frontend 0.1
+</div>

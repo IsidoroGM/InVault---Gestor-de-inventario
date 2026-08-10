@@ -1,0 +1,75 @@
+:host {
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+mat-toolbar {
+  min-height: 4.25rem;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid #dce3ef;
+  background: rgb(255 255 255 / 94%);
+  backdrop-filter: blur(16px);
+}
+
+.menu-glyph {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.title-group,
+.profile-copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  color: #14213d;
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.subtitle,
+.profile-copy small {
+  color: #68758d;
+  font-size: 0.72rem;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.avatar {
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  border-radius: 0.7rem;
+  color: #fff;
+  background: #315cc8;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.profile-copy strong {
+  color: #23304a;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 767px) {
+  mat-toolbar {
+    padding: 0 0.85rem;
+  }
+
+  .profile-copy,
+  .subtitle {
+    display: none;
+  }
+}

@@ -1,0 +1,70 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Visión general</p>
+    <h1>Cimentación frontend</h1>
+    <p class="lead">
+      Shell responsive, navegación y conexión base preparados para construir los flujos del MVP.
+    </p>
+  </div>
+  <a mat-flat-button routerLink="/products">Explorar productos</a>
+</header>
+
+<section class="readiness-grid" aria-label="Estado de la cimentación">
+  <mat-card appearance="outlined">
+    <mat-card-content>
+      <span class="card-index">01</span>
+      <h2>Arquitectura</h2>
+      <p>
+        Angular standalone, rutas diferidas, TypeScript estricto y límites core/shared/features.
+      </p>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card appearance="outlined">
+    <mat-card-content>
+      <span class="card-index">02</span>
+      <h2>Responsive</h2>
+      <p>Navegación persistente en escritorio y drawer accesible en tablet.</p>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card appearance="outlined">
+    <mat-card-content>
+      <span class="card-index">03</span>
+      <h2>Contrato</h2>
+      <p>Errores, paginación, roles y configuración API derivados del backend real.</p>
+    </mat-card-content>
+  </mat-card>
+</section>
+
+<section class="connection-panel" aria-labelledby="connection-title">
+  <div>
+    <p class="eyebrow">Integración</p>
+    <h2 id="connection-title">Estado del backend</h2>
+    <p>Comprobación pública mediante <code>GET /api/health</code>.</p>
+  </div>
+
+  <div class="health-status" aria-live="polite">
+    @if (health.state() === 'checking') {
+      <mat-spinner diameter="20" />
+    } @else {
+      <span
+        class="health-dot"
+        [class.available]="health.state() === 'available'"
+        [class.unavailable]="health.state() === 'unavailable'"
+        aria-hidden="true"
+      ></span>
+    }
+    <span>{{ health.message() }}</span>
+  </div>
+
+  <button mat-stroked-button type="button" (click)="health.check()">Volver a comprobar</button>
+</section>
+
+<section class="next-step" aria-labelledby="next-step-title">
+  <span class="next-step-label">Siguiente subfase</span>
+  <div>
+    <h2 id="next-step-title">Autenticación completa</h2>
+    <p>Login, JWT Bearer, guards, 401/403, cambio obligatorio de contraseña y sesión WebSocket.</p>
+  </div>
+</section>
