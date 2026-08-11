@@ -81,12 +81,15 @@ src/app
 │   └── services          # cliente REST y health
 ├── features
 │   ├── auth              # login, contraseña obligatoria y acceso denegado
-│   └── dashboard         # primera pantalla autenticada
+│   ├── dashboard         # primera pantalla autenticada
+│   └── products          # listado, filtros y mantenimiento de productos
 ├── layout                # shell, topbar y navegación por rol
 └── shared                # componentes y modelos reutilizables
 ```
 
-Productos, lotes, stock, movimientos, catálogos, usuarios y auditoría mantienen placeholders explícitos hasta incorporar sus flujos funcionales.
+El módulo de productos consume la búsqueda paginada del backend y carga categorías, ubicaciones y unidades activas para el formulario. Todos los roles oficiales pueden consultar. Las acciones de alta, edición, reactivación y desactivación lógica solo aparecen para `ADMIN` y `SUPERVISOR`, en consonancia con Spring Security.
+
+Lotes, stock, movimientos, catálogos, usuarios y auditoría mantienen placeholders explícitos hasta incorporar sus flujos funcionales.
 
 ## Límites actuales
 
@@ -94,4 +97,4 @@ Productos, lotes, stock, movimientos, catálogos, usuarios y auditoría mantiene
 - Sin QR ni códigos de barras.
 - Sin recuperación autónoma de contraseña; la gestiona un administrador.
 - Sin edición directa de cantidades de lote; el stock cambia exclusivamente mediante movimientos.
-- Las pantallas CRUD del inventario continúan pendientes.
+- Las pantallas CRUD restantes del inventario continúan pendientes.

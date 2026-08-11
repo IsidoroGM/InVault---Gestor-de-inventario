@@ -46,12 +46,10 @@ export const routes: Routes = [
       {
         path: 'products',
         title: 'Productos | InVault',
-        loadComponent: placeholder,
-        data: {
-          eyebrow: 'Inventario',
-          title: 'Productos',
-          description: 'Catálogo de productos, búsqueda y mantenimiento por roles.',
-        },
+        loadComponent: () =>
+          import('./features/products/products-page.component').then(
+            (module) => module.ProductsPageComponent,
+          ),
       },
       {
         path: 'batches',

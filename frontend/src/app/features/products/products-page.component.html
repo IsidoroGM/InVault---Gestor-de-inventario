@@ -1,0 +1,184 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Inventario</p>
+    <h1>Productos</h1>
+    <p class="lead">Consulta y mantén el catálogo maestro de artículos de InVault.</p>
+  </div>
+  @if (canManage()) {
+    <button mat-flat-button type="button" (click)="openCreate()" [disabled]="catalogsLoading()">
+      {{ catalogsLoading() ? 'Preparando formulario…' : 'Nuevo producto' }}
+    </button>
+  }
+</header>
+
+<section class="filter-panel" aria-label="Filtros de productos" [formGroup]="filters">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search-field">
+    <mat-label>Buscar productos</mat-label>
+    <input
+      matInput
+      formControlName="query"
+      placeholder="SKU, nombre o descripción"
+      autocomplete="off"
+    />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Estado</mat-label>
+    <mat-select formControlName="active">
+      <mat-option value="all">Todos</mat-option>
+      <mat-option value="active">Activos</mat-option>
+      <mat-option value="inactive">Inactivos</mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <button mat-button type="button" (click)="clearFilters()">Limpiar filtros</button>
+  <span class="result-count" aria-live="polite">{{ totalElements() }} resultados</span>
+</section>
+
+<section class="product-panel" aria-live="polite" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <div class="loading-state">
+      <mat-spinner diameter="34" />
+      <span>Cargando productos…</span>
+    </div>
+  } @else if (errorMessage()) {
+    <div class="message-state error-state" role="alert">
+      <div>
+        <h2>No pudimos mostrar los productos</h2>
+        <p>{{ errorMessage() }}</p>
+      </div>
+      <button mat-stroked-button type="button" (click)="reload()">Reintentar</button>
+    </div>
+  } @else if (products().length === 0) {
+    <div class="message-state empty-state">
+      <div>
+        <h2>No hay productos que coincidan</h2>
+        <p>Prueba con otros términos o cambia el filtro de estado.</p>
+      </div>
+      <button mat-stroked-button type="button" (click)="clearFilters()">Ver todos</button>
+    </div>
+  } @else {
+    <div class="desktop-table">
+      <table mat-table [dataSource]="products()">
+        <ng-container matColumnDef="sku">
+          <th mat-header-cell *matHeaderCellDef>SKU</th>
+          <td mat-cell *matCellDef="let product">
+            <span class="sku">{{ product.sku }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="product">
+          <th mat-header-cell *matHeaderCellDef>Producto</th>
+          <td mat-cell *matCellDef="let product">
+            <strong>{{ product.name }}</strong>
+            <small>{{ product.description || 'Sin descripción' }}</small>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="classification">
+          <th mat-header-cell *matHeaderCellDef>Clasificación</th>
+          <td mat-cell *matCellDef="let product">
+            <span>{{ product.categoryName }}</span>
+            <small>{{ product.locationName }} · {{ product.unitSymbol }}</small>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="minimumStock">
+          <th mat-header-cell *matHeaderCellDef>Stock mínimo</th>
+          <td mat-cell *matCellDef="let product">
+            {{ product.minimumStock }} {{ product.unitSymbol }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let product">
+            <span class="status" [class.inactive]="!product.active">
+              {{ product.active ? 'Activo' : 'Inactivo' }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef><span class="visually-hidden">Acciones</span></th>
+          <td mat-cell *matCellDef="let product" class="actions-cell">
+            @if (canManage()) {
+              <button mat-button type="button" (click)="openEdit(product)">Editar</button>
+              @if (product.active) {
+                <button
+                  mat-button
+                  type="button"
+                  class="danger-action"
+                  (click)="confirmDeactivate(product)"
+                >
+                  Desactivar
+                </button>
+              }
+            }
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    </div>
+
+    <div class="mobile-list">
+      @for (product of products(); track product.id) {
+        <article class="product-card">
+          <header>
+            <div>
+              <span class="sku">{{ product.sku }}</span>
+              <h2>{{ product.name }}</h2>
+            </div>
+            <span class="status" [class.inactive]="!product.active">
+              {{ product.active ? 'Activo' : 'Inactivo' }}
+            </span>
+          </header>
+          <p>{{ product.description || 'Sin descripción' }}</p>
+          <dl>
+            <div>
+              <dt>Categoría</dt>
+              <dd>{{ product.categoryName }}</dd>
+            </div>
+            <div>
+              <dt>Ubicación</dt>
+              <dd>{{ product.locationName }}</dd>
+            </div>
+            <div>
+              <dt>Stock mínimo</dt>
+              <dd>{{ product.minimumStock }} {{ product.unitSymbol }}</dd>
+            </div>
+          </dl>
+          @if (canManage()) {
+            <footer>
+              <button mat-button type="button" (click)="openEdit(product)">Editar</button>
+              @if (product.active) {
+                <button
+                  mat-button
+                  type="button"
+                  class="danger-action"
+                  (click)="confirmDeactivate(product)"
+                >
+                  Desactivar
+                </button>
+              }
+            </footer>
+          }
+        </article>
+      }
+    </div>
+  }
+
+  @if (!loading() && !errorMessage() && totalElements() > 0) {
+    <mat-paginator
+      [length]="totalElements()"
+      [pageIndex]="pageIndex"
+      [pageSize]="pageSize"
+      [pageSizeOptions]="pageSizes"
+      showFirstLastButtons
+      aria-label="Paginación de productos"
+      (page)="pageChanged($event)"
+    />
+  }
+</section>
