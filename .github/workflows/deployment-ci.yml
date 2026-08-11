@@ -1,0 +1,63 @@
+name: Deployment CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - compose.prod.yml
+      - .env.production.example
+      - frontend/Dockerfile
+      - frontend/.dockerignore
+      - frontend/docker/**
+      - frontend/package.json
+      - frontend/package-lock.json
+      - frontend/src/**
+      - pom.xml
+      - src/**
+      - .github/workflows/deployment-ci.yml
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - compose.prod.yml
+      - .env.production.example
+      - frontend/Dockerfile
+      - frontend/.dockerignore
+      - frontend/docker/**
+      - frontend/package.json
+      - frontend/package-lock.json
+      - frontend/src/**
+      - pom.xml
+      - src/**
+      - .github/workflows/deployment-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  containers:
+    name: Validate Compose and build images
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate production Compose model
+        run: docker compose --env-file .env.production.example --file compose.prod.yml config --quiet
+
+      - name: Build production images
+        run: docker compose --env-file .env.production.example --file compose.prod.yml build backend frontend
