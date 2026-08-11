@@ -1,0 +1,84 @@
+:host {
+  display: block;
+}
+
+[mat-dialog-title] {
+  padding-bottom: 0.5rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: #315cc8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+h2 {
+  margin: 0;
+  color: #17223d;
+  font-size: 1.45rem;
+}
+
+mat-dialog-content {
+  width: min(44rem, calc(100vw - 3rem));
+  max-width: 100%;
+}
+
+form {
+  display: grid;
+  gap: 0.15rem;
+  padding-top: 0.4rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.unit-grid {
+  grid-template-columns: minmax(7rem, 0.7fr) minmax(13rem, 1.5fr) minmax(7rem, 0.65fr);
+}
+
+.supplier-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.email-field {
+  grid-column: 1 / -1;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.form-alert {
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid #f0bdc5;
+  border-radius: 0.65rem;
+  color: #942b3a;
+  background: #fff2f4;
+}
+
+.button-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+@media (max-width: 680px) {
+  .unit-grid,
+  .supplier-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .email-field {
+    grid-column: auto;
+  }
+
+  mat-dialog-content {
+    width: auto;
+  }
+}

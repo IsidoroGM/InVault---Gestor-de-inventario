@@ -85,12 +85,10 @@ export const routes: Routes = [
       {
         path: 'catalogs',
         title: 'Catálogos | InVault',
-        loadComponent: placeholder,
-        data: {
-          eyebrow: 'Configuración',
-          title: 'Catálogos',
-          description: 'Unidades, categorías, ubicaciones y proveedores.',
-        },
+        loadComponent: () =>
+          import('./features/catalogs/catalogs-page.component').then(
+            (module) => module.CatalogsPageComponent,
+          ),
       },
       {
         path: 'users',

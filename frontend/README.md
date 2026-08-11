@@ -81,6 +81,7 @@ src/app
 │   └── services          # cliente REST y health
 ├── features
 │   ├── auth              # login, contraseña obligatoria y acceso denegado
+│   ├── catalogs          # categorías, ubicaciones, unidades y proveedores
 │   ├── dashboard         # primera pantalla autenticada
 │   └── products          # listado, filtros y mantenimiento de productos
 ├── layout                # shell, topbar y navegación por rol
@@ -89,7 +90,9 @@ src/app
 
 El módulo de productos consume la búsqueda paginada del backend y carga categorías, ubicaciones y unidades activas para el formulario. Todos los roles oficiales pueden consultar. Las acciones de alta, edición, reactivación y desactivación lógica solo aparecen para `ADMIN` y `SUPERVISOR`, en consonancia con Spring Security.
 
-Lotes, stock, movimientos, catálogos, usuarios y auditoría mantienen placeholders explícitos hasta incorporar sus flujos funcionales.
+La pantalla unificada de catálogos permite consultar y filtrar categorías, ubicaciones, unidades y proveedores. Los roles de gestión pueden crear, editar, reactivar y desactivar registros; no se eliminan datos maestros físicamente.
+
+Lotes, stock, movimientos, usuarios y auditoría mantienen placeholders explícitos hasta incorporar sus flujos funcionales.
 
 ## Límites actuales
 
