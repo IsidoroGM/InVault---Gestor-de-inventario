@@ -12,10 +12,14 @@ on:
       - .env.production.example
       - frontend/Dockerfile
       - frontend/.dockerignore
+      - frontend/angular.json
       - frontend/docker/**
+      - frontend/ngsw-config.json
       - frontend/package.json
       - frontend/package-lock.json
+      - frontend/public/**
       - frontend/src/**
+      - deploy/Caddyfile
       - pom.xml
       - src/**
       - .github/workflows/deployment-ci.yml
@@ -30,10 +34,14 @@ on:
       - .env.production.example
       - frontend/Dockerfile
       - frontend/.dockerignore
+      - frontend/angular.json
       - frontend/docker/**
+      - frontend/ngsw-config.json
       - frontend/package.json
       - frontend/package-lock.json
+      - frontend/public/**
       - frontend/src/**
+      - deploy/Caddyfile
       - pom.xml
       - src/**
       - .github/workflows/deployment-ci.yml

@@ -107,7 +107,17 @@ Auditoría proporciona consulta paginada por acción, entidad, actor y rango tem
 
 ## Límites actuales
 
-- Sin PWA ni modo offline.
+- PWA instalable con manifest, iconos propios, service worker y actualización aceptada por el usuario.
+- El shell visual puede abrirse con conectividad intermitente, pero las respuestas REST no se almacenan como datos offline y todas las mutaciones se bloquean sin conexión.
+
+## PWA y tablets
+
+La compilación de producción registra el service worker de Angular. Para comprobarlo localmente hay que servir `dist/frontend/browser` desde `localhost` después de ejecutar `npm run build`; `ng serve` continúa siendo el servidor de desarrollo y no representa el ciclo real del service worker.
+
+La barra global informa cuando el dispositivo pierde conexión, ofrece la instalación cuando el navegador expone el evento correspondiente y avisa cuando existe una versión nueva. Los formularios y páginas utilizan puntos de ruptura para tablet y móvil, mientras que las tablas extensas conservan desplazamiento horizontal. En dispositivos táctiles, los controles interactivos tienen un objetivo mínimo de 44 píxeles.
+
+El caché PWA se limita al shell, bundles, fuentes e imágenes. `/api/**` y `/ws/**` se excluyen de navegación y no existen `dataGroups` para respuestas del backend. Un interceptor rechaza cualquier método HTTP distinto de lectura cuando `navigator.onLine` indica que el dispositivo está offline.
+
 - Sin QR ni códigos de barras.
 - Sin recuperación autónoma de contraseña; la gestiona un administrador.
 - Sin edición directa de cantidades de lote; el stock cambia exclusivamente mediante movimientos.
