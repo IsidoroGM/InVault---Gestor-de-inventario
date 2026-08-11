@@ -35,3 +35,9 @@ build/
 # Local development configuration
 src/main/resources/application-dev.yml
 src/main/resources/application-local.yml
+
+# Deployment secrets and local overrides
+.env
+.env.*
+!.env.production.example
+compose.override.yml
