@@ -1,0 +1,65 @@
+<div class="auth-page">
+  <section class="auth-context" aria-label="InVault">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">IV</span>
+      <span><strong>InVault</strong><small>Gestión de inventario</small></span>
+    </div>
+
+    <div class="context-copy">
+      <p class="eyebrow">Acceso operativo</p>
+      <h1>Inventario bajo control.</h1>
+      <p>Accede a existencias, lotes y movimientos con los permisos asignados a tu cuenta.</p>
+    </div>
+
+    <span class="security-note">Sesión protegida con JWT y cierre por revocación.</span>
+  </section>
+
+  <main class="auth-form-column">
+    <section class="auth-card" aria-labelledby="login-title">
+      <header class="auth-card-header">
+        <p class="eyebrow">Bienvenido</p>
+        <h2 id="login-title">Iniciar sesión</h2>
+        <p>Introduce las credenciales facilitadas por administración.</p>
+      </header>
+
+      @if (sessionMessage) {
+        <p class="form-success" role="status">{{ sessionMessage }}</p>
+      }
+      @if (errorMessage()) {
+        <p class="form-alert" role="alert">{{ errorMessage() }}</p>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <mat-form-field appearance="outline">
+          <mat-label>Usuario</mat-label>
+          <input matInput formControlName="username" autocomplete="username" />
+          @if (form.controls.username.touched && form.controls.username.hasError('required')) {
+            <mat-error>El usuario es obligatorio.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Contraseña</mat-label>
+          <input
+            matInput
+            type="password"
+            formControlName="password"
+            autocomplete="current-password"
+          />
+          @if (form.controls.password.touched && form.controls.password.hasError('required')) {
+            <mat-error>La contraseña es obligatoria.</mat-error>
+          }
+        </mat-form-field>
+
+        <button class="submit-button" mat-flat-button type="submit" [disabled]="submitting()">
+          <span class="button-content">
+            @if (submitting()) {
+              <mat-spinner diameter="18" />
+            }
+            {{ submitting() ? 'Comprobando…' : 'Entrar en InVault' }}
+          </span>
+        </button>
+      </form>
+    </section>
+  </main>
+</div>

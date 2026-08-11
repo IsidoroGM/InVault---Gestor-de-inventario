@@ -10,7 +10,7 @@
   </mat-sidenav>
 
   <mat-sidenav-content>
-    <app-topbar [compact]="compact()" (menuToggle)="drawer.toggle()" />
+    <app-topbar [compact]="compact()" (menuToggle)="drawer.toggle()" (logoutRequested)="logout()" />
     <main id="main-content" tabindex="-1">
       <router-outlet />
     </main>

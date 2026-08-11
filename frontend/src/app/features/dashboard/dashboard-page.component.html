@@ -1,38 +1,36 @@
 <header class="page-header">
   <div>
     <p class="eyebrow">Visión general</p>
-    <h1>Cimentación frontend</h1>
+    <h1>Panel de inventario</h1>
     <p class="lead">
-      Shell responsive, navegación y conexión base preparados para construir los flujos del MVP.
+      Sesión autenticada, permisos por rol y conexión en tiempo real preparados para operar.
     </p>
   </div>
   <a mat-flat-button routerLink="/products">Explorar productos</a>
 </header>
 
-<section class="readiness-grid" aria-label="Estado de la cimentación">
+<section class="readiness-grid" aria-label="Capacidades de la aplicación">
   <mat-card appearance="outlined">
     <mat-card-content>
       <span class="card-index">01</span>
-      <h2>Arquitectura</h2>
-      <p>
-        Angular standalone, rutas diferidas, TypeScript estricto y límites core/shared/features.
-      </p>
+      <h2>Sesión segura</h2>
+      <p>JWT temporal, cierre por revocación y recuperación controlada ante expiración.</p>
     </mat-card-content>
   </mat-card>
 
   <mat-card appearance="outlined">
     <mat-card-content>
       <span class="card-index">02</span>
-      <h2>Responsive</h2>
-      <p>Navegación persistente en escritorio y drawer accesible en tablet.</p>
+      <h2>Permisos por rol</h2>
+      <p>Navegación y rutas alineadas con ADMIN, SUPERVISOR, WAREHOUSE y READ_ONLY.</p>
     </mat-card-content>
   </mat-card>
 
   <mat-card appearance="outlined">
     <mat-card-content>
       <span class="card-index">03</span>
-      <h2>Contrato</h2>
-      <p>Errores, paginación, roles y configuración API derivados del backend real.</p>
+      <h2>Tiempo real</h2>
+      <p>Cliente STOMP autenticado y suscripción de solo lectura a cambios de stock.</p>
     </mat-card-content>
   </mat-card>
 </section>
@@ -62,9 +60,12 @@
 </section>
 
 <section class="next-step" aria-labelledby="next-step-title">
-  <span class="next-step-label">Siguiente subfase</span>
+  <span class="next-step-label">Estado de sesión</span>
   <div>
-    <h2 id="next-step-title">Autenticación completa</h2>
-    <p>Login, JWT Bearer, guards, 401/403, cambio obligatorio de contraseña y sesión WebSocket.</p>
+    <h2 id="next-step-title">Sesión activa</h2>
+    <p>
+      {{ session()?.username }} · {{ session()?.roles?.join(', ') }} · WebSocket:
+      {{ realtime.state() }}
+    </p>
   </div>
 </section>

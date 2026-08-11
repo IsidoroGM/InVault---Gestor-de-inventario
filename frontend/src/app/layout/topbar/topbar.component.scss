@@ -46,6 +46,19 @@ mat-toolbar {
   gap: 0.7rem;
 }
 
+.connection-dot {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 50%;
+  background: #e49a32;
+  box-shadow: 0 0 0 0.2rem rgb(228 154 50 / 12%);
+}
+
+.connection-dot.connected {
+  background: #168a61;
+  box-shadow: 0 0 0 0.2rem rgb(22 138 97 / 12%);
+}
+
 .avatar {
   display: grid;
   width: 2.2rem;
@@ -71,5 +84,9 @@ mat-toolbar {
   .profile-copy,
   .subtitle {
     display: none;
+  }
+
+  .profile {
+    gap: 0.4rem;
   }
 }

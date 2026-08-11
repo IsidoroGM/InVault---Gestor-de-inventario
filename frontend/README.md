@@ -1,14 +1,14 @@
 # InVault Frontend
 
-Cimentación Angular del gestor empresarial de inventario InVault. Esta subfase entrega el shell responsive, las rutas iniciales y la infraestructura común para consumir el backend Spring Boot sin implementar todavía el ciclo completo de autenticación.
+Aplicación Angular del gestor empresarial de inventario InVault. Incluye el shell responsive, autenticación JWT, autorización por roles y conexión STOMP con el backend Spring Boot.
 
 ## Requisitos
 
 - Node.js compatible con Angular 21: `^20.19.0`, `^22.12.0` o `^24.0.0`.
 - npm 11 o una versión compatible con el `package-lock.json`.
-- Backend InVault disponible en `http://localhost:8080` para la comprobación de salud.
+- Backend InVault en `http://localhost:8080` para iniciar sesión y consumir datos.
 
-La versión seleccionada es Angular 21 LTS. Angular 22 requiere Node 24.15 o superior y el entorno de desarrollo usado para esta subfase dispone de Node 24.14.x.
+La versión seleccionada es Angular 21 LTS. Angular 22 requiere Node 24.15 o superior y este entorno dispone de Node 24.14.x.
 
 ## Instalación y arranque
 
@@ -23,60 +23,75 @@ La aplicación queda disponible en `http://localhost:4200`. El backend permite e
 ## Comprobaciones
 
 ```powershell
+npm run format:check
 npm run build
 npm run test:ci
-npm run format:check
+npm audit --omit=dev
 ```
 
-`npm run build` usa la configuración de producción por defecto. Las pruebas se ejecutan con Vitest y sin modo interactivo.
+`npm run build` usa producción por defecto. Las pruebas se ejecutan con Vitest y sin modo interactivo.
 
 ## Configuración por entorno
 
-Los valores se centralizan en `src/environments/` y se exponen a la aplicación mediante `API_CONFIGURATION`.
+Los valores se centralizan en `src/environments/` y se inyectan mediante `API_CONFIGURATION`.
 
 | Entorno    | REST                    | WebSocket                | Tema               |
 | ---------- | ----------------------- | ------------------------ | ------------------ |
 | Desarrollo | `http://localhost:8080` | `ws://localhost:8080/ws` | `/topic/inventory` |
 | Producción | mismo origen (`''`)     | `/ws`                    | `/topic/inventory` |
 
-La configuración de producción presupone un proxy inverso que publique frontend y backend bajo el mismo origen. Debe ajustarse al despliegue real antes de publicar.
+Producción presupone un proxy inverso que publique frontend y backend bajo el mismo origen.
 
-## Arquitectura inicial
+## Autenticación y sesión
+
+1. `POST /api/auth/login` devuelve el JWT, identidad, roles, expiración y `mustChangePassword`.
+2. La sesión se conserva en `sessionStorage`, limitada a la pestaña actual. No se utiliza `localStorage`.
+3. El interceptor añade `Authorization: Bearer <token>` únicamente a peticiones `/api/` del backend configurado.
+4. Un 401 elimina íntegramente la sesión y devuelve al login.
+5. Si el backend exige cambio de contraseña, solo se permiten `/change-password` y logout.
+6. Cambiar la contraseña o cerrar sesión revoca el token; el frontend lo descarta y exige un nuevo login.
+
+El almacenamiento web no protege un token frente a una vulnerabilidad XSS. Por eso la aplicación evita HTML dinámico, limita el token a `sessionStorage` y nunca lo envía a destinos externos. Una evolución posterior puede adoptar cookies `HttpOnly` si cambia el contrato backend.
+
+## Roles
+
+- `ADMIN`: acceso completo, usuarios y auditoría.
+- `SUPERVISOR`: consulta y operación de gestión, usuarios y auditoría.
+- `WAREHOUSE`: consulta y movimientos de stock.
+- `READ_ONLY`: consulta del inventario.
+
+Los guards protegen las rutas aunque un usuario introduzca manualmente la URL. La navegación oculta las secciones no disponibles, pero el backend sigue siendo la autoridad final.
+
+## Tiempo real
+
+`InventoryRealtimeService` abre STOMP nativo contra `/ws` después del login y envía el JWT en el frame `CONNECT`. Solo se suscribe a `/topic/inventory`; el backend no permite mensajes de escritura desde el navegador.
+
+La conexión se desactiva al cerrar o invalidar la sesión y se reintenta automáticamente ante cortes transitorios. Los eventos admitidos usan `eventType: STOCK_UPDATED` y el contrato inmutable definido por el backend.
+
+## Arquitectura
 
 ```text
 src/app
 ├── core
-│   ├── configuration      # URLs y token de configuración
-│   ├── error-handling     # Normalización del contrato de error
-│   ├── interceptors       # Interceptor HTTP común, todavía sin JWT
-│   └── services           # Cliente API y comprobación de health
+│   ├── auth              # sesión, servicio y guards
+│   ├── configuration     # URLs e inyección de configuración
+│   ├── error-handling    # normalización y mensajes de autenticación
+│   ├── interceptors      # Bearer, 401/403 y error API
+│   ├── realtime          # cliente STOMP y contrato de eventos
+│   └── services          # cliente REST y health
 ├── features
-│   └── dashboard          # Primera pantalla funcional
-├── layout
-│   ├── main-layout        # Shell desktop/tablet
-│   ├── navigation         # Navegación lateral
-│   └── topbar             # Cabecera
-└── shared
-    ├── components         # Placeholder reutilizable de rutas
-    └── models             # Error, página y roles oficiales
+│   ├── auth              # login, contraseña obligatoria y acceso denegado
+│   └── dashboard         # primera pantalla autenticada
+├── layout                # shell, topbar y navegación por rol
+└── shared                # componentes y modelos reutilizables
 ```
 
-Las rutas de productos, lotes, stock, movimientos, catálogos, usuarios y auditoría existen como placeholders explícitos. Sus carpetas se crearán al incorporar funcionalidad real para evitar estructura vacía.
+Productos, lotes, stock, movimientos, catálogos, usuarios y auditoría mantienen placeholders explícitos hasta incorporar sus flujos funcionales.
 
-## Contratos backend ya representados
-
-- Error estándar: `status`, `error`, `message`, `path`, `timestamp` y `fieldErrors` opcional.
-- Página: `content`, `page`, `size`, `totalElements`, `totalPages`, `first` y `last`.
-- Roles: `ADMIN`, `SUPERVISOR`, `WAREHOUSE` y `READ_ONLY`.
-- Health público: `GET /api/health`, respuesta de texto.
-- WebSocket reservado: `/ws` y `/topic/inventory`.
-
-## Límites de esta subfase
+## Límites actuales
 
 - Sin PWA ni modo offline.
 - Sin QR ni códigos de barras.
-- Sin cliente STOMP todavía.
-- Sin almacenamiento de token, guards ni interceptor Bearer.
-- Sin edición directa de cantidades de lote; el futuro flujo de stock usará exclusivamente movimientos.
-
-La siguiente subfase debe implementar login, JWT Bearer, logout, guards, manejo de 401/403, cambio obligatorio de contraseña, navegación por roles y cierre de WebSocket por revocación.
+- Sin recuperación autónoma de contraseña; la gestiona un administrador.
+- Sin edición directa de cantidades de lote; el stock cambia exclusivamente mediante movimientos.
+- Las pantallas CRUD del inventario continúan pendientes.

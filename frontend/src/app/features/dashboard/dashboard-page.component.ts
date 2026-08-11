@@ -5,6 +5,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 
 import { BackendHealthService } from '../../core/services/backend-health.service';
+import { AuthSessionStore } from '../../core/auth/auth-session.store';
+import { InventoryRealtimeService } from '../../core/realtime/inventory-realtime.service';
 
 @Component({
   selector: 'app-dashboard-page',
@@ -15,6 +17,8 @@ import { BackendHealthService } from '../../core/services/backend-health.service
 })
 export class DashboardPageComponent implements OnInit {
   protected readonly health = inject(BackendHealthService);
+  protected readonly session = inject(AuthSessionStore).session;
+  protected readonly realtime = inject(InventoryRealtimeService);
 
   ngOnInit(): void {
     this.health.check();
