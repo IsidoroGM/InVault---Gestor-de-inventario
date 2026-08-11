@@ -1,0 +1,70 @@
+:host {
+  display: block;
+}
+[mat-dialog-title] {
+  padding-bottom: 0.5rem;
+}
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: #315cc8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+h2 {
+  margin: 0;
+  color: #17223d;
+  font-size: 1.45rem;
+}
+mat-dialog-content {
+  width: min(44rem, calc(100vw - 3rem));
+  max-width: 100%;
+}
+form {
+  display: grid;
+  gap: 0.2rem;
+  padding-top: 0.4rem;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.8fr;
+  gap: 1rem;
+}
+.full-width {
+  width: 100%;
+}
+.quantity-lock {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  color: #43506a;
+  background: #eef2f8;
+  flex-direction: column;
+}
+.quantity-lock span {
+  color: #69758c;
+  font-size: 0.84rem;
+}
+.form-alert {
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid #f0bdc5;
+  border-radius: 0.65rem;
+  color: #942b3a;
+  background: #fff2f4;
+}
+.button-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+@media (max-width: 700px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  mat-dialog-content {
+    width: auto;
+  }
+}

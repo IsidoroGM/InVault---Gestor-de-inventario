@@ -1,0 +1,75 @@
+<header mat-dialog-title>
+  <p class="eyebrow">{{ editing ? 'Editar lote' : 'Alta de lote' }}</p>
+  <h2>{{ editing ? data.batch?.batchCode : 'Nuevo lote' }}</h2>
+</header>
+
+<mat-dialog-content>
+  @if (errorMessage()) {
+    <p class="form-alert" role="alert">{{ errorMessage() }}</p>
+  }
+  <form id="batch-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Producto</mat-label>
+        <mat-select formControlName="productId">
+          @for (product of data.products; track product.id) {
+            <mat-option [value]="product.id">{{ product.sku }} · {{ product.name }}</mat-option>
+          }
+        </mat-select>
+        @if (serverError('productId'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        } @else if (form.controls.productId.hasError('required')) {
+          <mat-error>Selecciona un producto.</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Código de lote</mat-label>
+        <input matInput formControlName="batchCode" maxlength="100" autocomplete="off" />
+        <mat-hint>Se guardará en mayúsculas</mat-hint>
+        @if (serverError('batchCode'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        } @else if (form.controls.batchCode.hasError('required')) {
+          <mat-error>El código es obligatorio.</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Estado</mat-label>
+        <mat-select formControlName="status">
+          @for (status of statusOptions; track status) {
+            <mat-option [value]="status">{{ statusLabels[status] }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Notas internas</mat-label>
+      <textarea matInput formControlName="notes" maxlength="255" rows="3"></textarea>
+      <mat-hint align="end">{{ form.controls.notes.value.length }}/255</mat-hint>
+      @if (serverError('notes'); as message) {
+        <mat-error>{{ message }}</mat-error>
+      }
+    </mat-form-field>
+
+    <aside class="quantity-lock" aria-label="Cantidad protegida">
+      <strong>Cantidad: {{ data.batch?.quantity ?? 0 }}</strong>
+      <span>Solo puede cambiar mediante un movimiento de stock auditable.</span>
+    </aside>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="submitting()">
+    Cancelar
+  </button>
+  <button mat-flat-button type="submit" form="batch-form" [disabled]="submitting()">
+    <span class="button-content">
+      @if (submitting()) {
+        <mat-spinner diameter="18" />
+      }
+      {{ submitting() ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear lote' }}
+    </span>
+  </button>
+</mat-dialog-actions>

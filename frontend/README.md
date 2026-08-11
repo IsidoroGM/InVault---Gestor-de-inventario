@@ -82,8 +82,11 @@ src/app
 ├── features
 │   ├── auth              # login, contraseña obligatoria y acceso denegado
 │   ├── catalogs          # categorías, ubicaciones, unidades y proveedores
-│   ├── dashboard         # primera pantalla autenticada
-│   └── products          # listado, filtros y mantenimiento de productos
+│   ├── batches           # lotes, estados y cantidad protegida
+│   ├── dashboard         # indicadores, alertas y actividad real
+│   ├── movements         # entradas, salidas y ajustes auditables
+│   ├── products          # listado, filtros y mantenimiento de productos
+│   └── stock             # saldos agregados y mínimos
 ├── layout                # shell, topbar y navegación por rol
 └── shared                # componentes y modelos reutilizables
 ```
@@ -92,7 +95,11 @@ El módulo de productos consume la búsqueda paginada del backend y carga catego
 
 La pantalla unificada de catálogos permite consultar y filtrar categorías, ubicaciones, unidades y proveedores. Los roles de gestión pueden crear, editar, reactivar y desactivar registros; no se eliminan datos maestros físicamente.
 
-Lotes, stock, movimientos, usuarios y auditoría mantienen placeholders explícitos hasta incorporar sus flujos funcionales.
+Lotes ofrece listado paginado, filtro por producto, alta, edición y gestión de estados. La cantidad se muestra siempre como solo lectura y no forma parte de las peticiones de alta o edición.
+
+Movimientos es el único módulo capaz de cambiar cantidades. Registra entradas, salidas y ajustes con los saldos anterior y posterior, responsable, lote, proveedor y motivo. Stock agrega esos saldos por producto y señala automáticamente los mínimos. Lotes, stock, movimientos y dashboard reaccionan a los eventos STOMP `STOCK_UPDATED` y vuelven a consultar al backend como fuente de verdad.
+
+Usuarios y auditoría mantienen placeholders explícitos hasta incorporar sus flujos funcionales.
 
 ## Límites actuales
 
@@ -100,4 +107,4 @@ Lotes, stock, movimientos, usuarios y auditoría mantienen placeholders explíci
 - Sin QR ni códigos de barras.
 - Sin recuperación autónoma de contraseña; la gestiona un administrador.
 - Sin edición directa de cantidades de lote; el stock cambia exclusivamente mediante movimientos.
-- Las pantallas CRUD restantes del inventario continúan pendientes.
+- Continúan pendientes las pantallas de usuarios y auditoría.

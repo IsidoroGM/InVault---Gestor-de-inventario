@@ -54,33 +54,26 @@ export const routes: Routes = [
       {
         path: 'batches',
         title: 'Lotes | InVault',
-        loadComponent: placeholder,
-        data: {
-          eyebrow: 'Inventario',
-          title: 'Lotes',
-          description:
-            'Consulta de lotes y sus estados. La cantidad nunca se editará directamente.',
-        },
+        loadComponent: () =>
+          import('./features/batches/batches-page.component').then(
+            (module) => module.BatchesPageComponent,
+          ),
       },
       {
         path: 'stock',
         title: 'Stock | InVault',
-        loadComponent: placeholder,
-        data: {
-          eyebrow: 'Existencias',
-          title: 'Resumen de stock',
-          description: 'Saldos agregados por producto y alertas de stock mínimo.',
-        },
+        loadComponent: () =>
+          import('./features/stock/stock-page.component').then(
+            (module) => module.StockPageComponent,
+          ),
       },
       {
         path: 'movements',
         title: 'Movimientos | InVault',
-        loadComponent: placeholder,
-        data: {
-          eyebrow: 'Operación',
-          title: 'Movimientos',
-          description: 'Entradas, salidas y ajustes auditables sobre lotes.',
-        },
+        loadComponent: () =>
+          import('./features/movements/movements-page.component').then(
+            (module) => module.MovementsPageComponent,
+          ),
       },
       {
         path: 'catalogs',
