@@ -6,12 +6,19 @@ import { Router, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
+import { PwaStatusBarComponent } from '../../core/pwa/pwa-status-bar/pwa-status-bar.component';
 import { NavigationComponent } from '../navigation/navigation.component';
 import { TopbarComponent } from '../topbar/topbar.component';
 
 @Component({
   selector: 'app-main-layout',
-  imports: [MatSidenavModule, NavigationComponent, TopbarComponent, RouterOutlet],
+  imports: [
+    MatSidenavModule,
+    NavigationComponent,
+    PwaStatusBarComponent,
+    TopbarComponent,
+    RouterOutlet,
+  ],
   templateUrl: './main-layout.component.html',
   styleUrl: './main-layout.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

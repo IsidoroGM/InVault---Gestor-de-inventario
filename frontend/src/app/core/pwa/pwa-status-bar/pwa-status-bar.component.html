@@ -1,0 +1,45 @@
+<div class="status-region" aria-live="polite">
+  @if (network.offline()) {
+    <section class="status-message offline" role="alert">
+      <div>
+        <strong>Estás trabajando sin conexión</strong>
+        <span
+          >Las consultas ya abiertas pueden seguir disponibles, pero las modificaciones están
+          bloqueadas.</span
+        >
+      </div>
+    </section>
+  }
+
+  @if (pwa.updateAvailable()) {
+    <section class="status-message update">
+      <div>
+        <strong>Nueva versión disponible</strong>
+        <span>{{ pwa.updateError() || 'Actualiza cuando termines la operación en curso.' }}</span>
+      </div>
+      <button
+        mat-flat-button
+        type="button"
+        [disabled]="pwa.updating()"
+        (click)="pwa.activateUpdate()"
+      >
+        {{ pwa.updating() ? 'Actualizando…' : 'Actualizar ahora' }}
+      </button>
+    </section>
+  } @else if (pwa.canInstall()) {
+    <section class="status-message install">
+      <div>
+        <strong>Instalar InVault</strong>
+        <span>Añádelo al escritorio o a la pantalla de inicio para abrirlo como aplicación.</span>
+      </div>
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="pwa.installing()"
+        (click)="pwa.install()"
+      >
+        {{ pwa.installing() ? 'Instalando…' : 'Instalar' }}
+      </button>
+    </section>
+  }
+</div>

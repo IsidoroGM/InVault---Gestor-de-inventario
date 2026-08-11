@@ -51,3 +51,14 @@ textarea {
   color: #fff;
   background: #315cc8;
 }
+
+@media (pointer: coarse) {
+  button,
+  [role='button'],
+  a[mat-button],
+  a[mat-flat-button],
+  a[mat-stroked-button] {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}

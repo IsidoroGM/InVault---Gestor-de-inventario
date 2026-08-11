@@ -1,0 +1,71 @@
+:host {
+  display: block;
+}
+
+.status-region:empty {
+  display: none;
+}
+
+.status-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.5rem;
+  border-bottom: 1px solid transparent;
+  font-size: 0.82rem;
+}
+
+.status-message div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+}
+
+.status-message strong {
+  white-space: nowrap;
+}
+
+.offline {
+  color: #6f3407;
+  border-color: #f2c58f;
+  background: #fff3df;
+}
+
+.update {
+  color: #153b73;
+  border-color: #b8d0f3;
+  background: #eaf3ff;
+}
+
+.install {
+  color: #15533e;
+  border-color: #a9dfc8;
+  background: #e9f8f1;
+}
+
+@media (max-width: 767px) {
+  .status-message {
+    align-items: flex-start;
+    padding: 0.75rem 1rem;
+  }
+
+  .status-message div {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .status-message span {
+    line-height: 1.35;
+  }
+}
+
+@media (max-width: 420px) {
+  .status-message {
+    flex-direction: column;
+  }
+
+  .status-message button {
+    width: 100%;
+  }
+}
