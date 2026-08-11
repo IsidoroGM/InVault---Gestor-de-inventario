@@ -1,0 +1,132 @@
+<header mat-dialog-title>
+  <p class="eyebrow">{{ editing ? 'Editar registro' : 'Nuevo registro' }}</p>
+  <h2>{{ editing ? data.item?.name : definition.newLabel }}</h2>
+</header>
+
+<mat-dialog-content>
+  @if (errorMessage()) {
+    <p class="form-alert" role="alert">{{ errorMessage() }}</p>
+  }
+
+  <form id="catalog-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    @if (data.kind === 'units') {
+      <div class="form-grid unit-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Código</mat-label>
+          <input matInput formControlName="code" maxlength="30" autocomplete="off" />
+          <mat-hint>Se guardará en mayúsculas</mat-hint>
+          @if (serverError('code'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          } @else if (form.controls.code.hasError('required')) {
+            <mat-error>El código es obligatorio.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Nombre</mat-label>
+          <input matInput formControlName="name" maxlength="100" autocomplete="off" />
+          @if (serverError('name'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          } @else if (form.controls.name.hasError('required')) {
+            <mat-error>El nombre es obligatorio.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Símbolo</mat-label>
+          <input matInput formControlName="symbol" maxlength="20" autocomplete="off" />
+          @if (serverError('symbol'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          }
+        </mat-form-field>
+      </div>
+    } @else {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Nombre</mat-label>
+        <input
+          matInput
+          formControlName="name"
+          [maxlength]="data.kind === 'suppliers' ? 150 : 100"
+          autocomplete="off"
+        />
+        @if (serverError('name'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        } @else if (form.controls.name.hasError('required')) {
+          <mat-error>El nombre es obligatorio.</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (data.kind === 'suppliers') {
+      <div class="form-grid supplier-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Persona de contacto</mat-label>
+          <input matInput formControlName="contactName" maxlength="120" autocomplete="off" />
+          @if (serverError('contactName'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Teléfono</mat-label>
+          <input matInput formControlName="phone" maxlength="30" autocomplete="tel" />
+          @if (serverError('phone'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="email-field">
+          <mat-label>Correo electrónico</mat-label>
+          <input
+            matInput
+            type="email"
+            formControlName="email"
+            maxlength="120"
+            autocomplete="email"
+          />
+          @if (serverError('email'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          } @else if (form.controls.email.hasError('email')) {
+            <mat-error>Introduce un correo electrónico válido.</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Notas internas</mat-label>
+        <textarea matInput formControlName="notes" maxlength="255" rows="3"></textarea>
+        <mat-hint align="end">{{ form.controls.notes.value.length }}/255</mat-hint>
+        @if (serverError('notes'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        }
+      </mat-form-field>
+    } @else {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Descripción</mat-label>
+        <textarea matInput formControlName="description" maxlength="255" rows="3"></textarea>
+        <mat-hint align="end">{{ form.controls.description.value.length }}/255</mat-hint>
+        @if (serverError('description'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        }
+      </mat-form-field>
+    }
+
+    @if (editing) {
+      <mat-slide-toggle formControlName="active">Registro activo</mat-slide-toggle>
+    }
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="submitting()">
+    Cancelar
+  </button>
+  <button mat-flat-button type="submit" form="catalog-form" [disabled]="submitting()">
+    <span class="button-content">
+      @if (submitting()) {
+        <mat-spinner diameter="18" />
+      }
+      {{ submitting() ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear registro' }}
+    </span>
+  </button>
+</mat-dialog-actions>

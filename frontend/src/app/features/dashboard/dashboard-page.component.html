@@ -1,0 +1,134 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Visión general</p>
+    <h1>Panel de inventario</h1>
+    <p class="lead">Actividad, alertas y saldos reales actualizados con cada movimiento.</p>
+  </div>
+  @if (canMoveStock()) {
+    <a mat-flat-button routerLink="/movements">Registrar movimiento</a>
+  }
+</header>
+
+@if (loading() && !data()) {
+  <section class="state"><mat-spinner diameter="36" />Cargando indicadores…</section>
+} @else if (errorMessage() && !data()) {
+  <section class="state error">
+    <div>
+      <h2>El dashboard no está disponible</h2>
+      <p>{{ errorMessage() }}</p>
+    </div>
+    <button mat-stroked-button (click)="reload()">Reintentar</button>
+  </section>
+} @else if (data(); as dashboard) {
+  <section class="metrics" aria-label="Indicadores principales">
+    <article>
+      <span>Productos activos</span><strong>{{ dashboard.activeProductCount }}</strong
+      ><a routerLink="/products">Ver productos →</a>
+    </article>
+    <article [class.alert]="dashboard.lowStockProductCount > 0">
+      <span>Alertas de mínimo</span><strong>{{ dashboard.lowStockProductCount }}</strong
+      ><a routerLink="/stock">Revisar stock →</a>
+    </article>
+    <article>
+      <span>Lotes disponibles</span><strong>{{ dashboard.availableBatchCount }}</strong
+      ><a routerLink="/batches">Ver lotes →</a>
+    </article>
+  </section>
+
+  <section class="dashboard-grid">
+    <article class="panel">
+      <header>
+        <div>
+          <p class="eyebrow">Atención</p>
+          <h2>Stock por debajo del mínimo</h2>
+        </div>
+        <a mat-button routerLink="/stock">Ver resumen</a>
+      </header>
+      @if (dashboard.lowStockProducts.length === 0) {
+        <div class="empty">
+          <strong>Todo bajo control</strong><span>No hay productos bajo el mínimo.</span>
+        </div>
+      } @else {
+        <div class="low-stock-list">
+          @for (item of dashboard.lowStockProducts; track item.productId) {
+            <a routerLink="/stock"
+              ><div>
+                <span class="sku">{{ item.sku }}</span
+                ><strong>{{ item.productName }}</strong>
+              </div>
+              <div class="stock-value">
+                <strong>{{ item.currentStock }}</strong
+                ><span>mín. {{ item.minimumStock }} {{ item.unitCode }}</span>
+              </div></a
+            >
+          }
+        </div>
+      }
+    </article>
+
+    <article class="panel">
+      <header>
+        <div>
+          <p class="eyebrow">Trazabilidad</p>
+          <h2>Movimientos recientes</h2>
+        </div>
+        <a mat-button routerLink="/movements">Ver todos</a>
+      </header>
+      @if (dashboard.recentMovements.length === 0) {
+        <div class="empty">
+          <strong>Sin movimientos</strong><span>La actividad aparecerá aquí.</span>
+        </div>
+      } @else {
+        <div class="movement-list">
+          @for (item of dashboard.recentMovements; track item.id) {
+            <a routerLink="/movements"
+              ><span
+                class="movement-icon"
+                [class.negative]="direction(item.movementType) === 'negative'"
+                >{{ direction(item.movementType) === 'positive' ? '+' : '−' }}</span
+              >
+              <div>
+                <strong>{{ item.productName }}</strong
+                ><span
+                  >{{ typeLabel(item.movementType) }} · {{ item.batchCode }} ·
+                  {{ item.username }}</span
+                >
+              </div>
+              <div class="movement-value">
+                <strong>{{ item.quantity }}</strong
+                ><span>{{ item.movementDate | date: 'short' }}</span>
+              </div></a
+            >
+          }
+        </div>
+      }
+    </article>
+  </section>
+}
+
+<section class="connection-panel" aria-label="Estado de integraciones">
+  <div>
+    <span class="connection-dot" [class.connected]="health.state() === 'available'"></span>
+    <div>
+      <strong>API backend</strong><span>{{ health.message() }}</span>
+    </div>
+  </div>
+  <div>
+    <span
+      class="connection-dot"
+      [class.connected]="realtime.state() === 'connected'"
+      [class.error]="realtime.state() === 'error'"
+    ></span>
+    <div>
+      <strong>Actualización STOMP</strong
+      ><span>{{
+        realtime.state() === 'connected'
+          ? 'Conectada'
+          : realtime.state() === 'connecting'
+            ? 'Conectando…'
+            : 'Desconectada'
+      }}</span>
+    </div>
+  </div>
+  <button mat-stroked-button type="button" (click)="reload()">Actualizar ahora</button>
+</section>

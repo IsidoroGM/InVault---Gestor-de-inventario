@@ -1,0 +1,97 @@
+<header mat-dialog-title>
+  <p class="eyebrow">Administración</p>
+  <h2>{{ editing ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
+</header>
+
+<mat-dialog-content>
+  @if (errorMessage()) {
+    <p class="form-alert" role="alert">{{ errorMessage() }}</p>
+  }
+  <form id="user-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Usuario</mat-label>
+        <input
+          matInput
+          formControlName="username"
+          maxlength="50"
+          autocomplete="off"
+          [readonly]="editing"
+        />
+        @if (editing) {
+          <mat-hint>El identificador no se puede modificar</mat-hint>
+        }
+        @if (serverError('username'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        } @else if (form.controls.username.hasError('required')) {
+          <mat-error>El usuario es obligatorio.</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Correo electrónico</mat-label>
+        <input matInput type="email" formControlName="email" maxlength="120" autocomplete="off" />
+        @if (serverError('email'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        } @else if (form.controls.email.invalid) {
+          <mat-error>Introduce un correo válido.</mat-error>
+        }
+      </mat-form-field>
+
+      @if (!editing) {
+        <mat-form-field appearance="outline">
+          <mat-label>Contraseña temporal</mat-label>
+          <input
+            matInput
+            type="password"
+            formControlName="temporaryPassword"
+            maxlength="72"
+            autocomplete="new-password"
+          />
+          <mat-hint>Entre 12 y 72 caracteres</mat-hint>
+          @if (serverError('temporaryPassword'); as message) {
+            <mat-error>{{ message }}</mat-error>
+          } @else if (form.controls.temporaryPassword.invalid) {
+            <mat-error>Debe contener al menos 12 caracteres.</mat-error>
+          }
+        </mat-form-field>
+      }
+
+      <mat-form-field appearance="outline" [class.full-width]="editing">
+        <mat-label>Roles</mat-label>
+        <mat-select formControlName="roles" multiple>
+          @for (role of data.roles; track role.id) {
+            <mat-option [value]="role.name"
+              >{{ roleLabels[role.name] }} · {{ role.name }}</mat-option
+            >
+          }
+        </mat-select>
+        @if (serverError('roles'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        } @else if (form.controls.roles.hasError('required')) {
+          <mat-error>Selecciona al menos un rol.</mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <aside class="session-warning">
+      @if (editing) {
+        Guardar roles o correo revocará las sesiones activas de este usuario.
+      } @else {
+        La cuenta deberá cambiar la contraseña temporal en su primer acceso.
+      }
+    </aside>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="submitting()">
+    Cancelar
+  </button>
+  <button mat-flat-button type="submit" form="user-form" [disabled]="submitting()">
+    @if (submitting()) {
+      <mat-spinner diameter="18" />
+    }
+    {{ submitting() ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear usuario' }}
+  </button>
+</mat-dialog-actions>

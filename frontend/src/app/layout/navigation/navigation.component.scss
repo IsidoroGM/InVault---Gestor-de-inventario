@@ -1,0 +1,102 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1.25rem 0.85rem;
+  color: #e9f0ff;
+  background: linear-gradient(180deg, #14213d 0%, #0b132b 100%);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.55rem 1.4rem;
+}
+
+.brand-mark {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 0.85rem;
+  color: #fff;
+  background: #2f65d9;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.brand strong,
+.brand small {
+  display: block;
+}
+
+.brand strong {
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
+}
+
+.brand small {
+  margin-top: 0.12rem;
+  color: #aebddd;
+  font-size: 0.72rem;
+}
+
+mat-nav-list {
+  padding: 0;
+}
+
+a[mat-list-item] {
+  margin-bottom: 0.28rem;
+  border-radius: 0.72rem;
+  color: #cbd7ef;
+}
+
+a[mat-list-item]:hover,
+a[mat-list-item].active {
+  color: #fff;
+  background: rgb(72 111 201 / 30%);
+}
+
+.nav-label {
+  color: #cbd7ef;
+}
+
+a[mat-list-item]:hover .nav-label,
+a[mat-list-item].active .nav-label {
+  color: #fff;
+}
+
+.nav-marker {
+  display: inline-grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  margin-right: 0.7rem;
+  place-items: center;
+  border-radius: 0.55rem;
+  color: #bcd0ff;
+  background: rgb(255 255 255 / 8%);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.sidebar-note {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: auto;
+  padding: 0.85rem 0.65rem 0;
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  color: #94a7cc;
+  font-size: 0.75rem;
+}
+
+.status-dot {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 50%;
+  background: #65d6a8;
+  box-shadow: 0 0 0 0.2rem rgb(101 214 168 / 14%);
+}

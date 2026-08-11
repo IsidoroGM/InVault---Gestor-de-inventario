@@ -1,0 +1,31 @@
+<mat-toolbar>
+  @if (compact()) {
+    <button mat-icon-button type="button" aria-label="Abrir navegación" (click)="menuToggle.emit()">
+      <span class="menu-glyph" aria-hidden="true">☰</span>
+    </button>
+  }
+
+  <div class="title-group">
+    <span class="title">Panel de inventario</span>
+    <span class="subtitle">Entorno de desarrollo</span>
+  </div>
+
+  <span class="spacer"></span>
+
+  @if (session(); as activeSession) {
+    <div class="profile" aria-label="Sesión de {{ activeSession.username }}">
+      <span
+        class="connection-dot"
+        [class.connected]="realtime.state() === 'connected'"
+        [title]="'Tiempo real: ' + realtime.state()"
+        aria-hidden="true"
+      ></span>
+      <span class="avatar" aria-hidden="true">{{ initials(activeSession.username) }}</span>
+      <span class="profile-copy">
+        <strong>{{ activeSession.username }}</strong>
+        <small>{{ roleLabel(activeSession.roles[0]) }}</small>
+      </span>
+      <button mat-button type="button" (click)="logoutRequested.emit()">Salir</button>
+    </div>
+  }
+</mat-toolbar>

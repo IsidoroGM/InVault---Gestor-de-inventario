@@ -1,0 +1,86 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Existencias</p>
+    <h1>Resumen de stock</h1>
+    <p class="lead">Saldos agregados calculados desde lotes disponibles y alertas de mínimos.</p>
+  </div>
+  <div class="header-actions">
+    <a mat-stroked-button routerLink="/batches">Ver lotes</a>
+    @if (canMoveStock()) {
+      <a mat-flat-button routerLink="/movements">Registrar movimiento</a>
+    }
+  </div>
+</header>
+
+<section class="metrics" aria-label="Indicadores de stock">
+  <article>
+    <span>Productos activos</span><strong>{{ stock().length }}</strong>
+  </article>
+  <article [class.alert]="lowStockCount() > 0">
+    <span>Por debajo del mínimo</span><strong>{{ lowStockCount() }}</strong>
+  </article>
+  <article>
+    <span>Productos con existencias</span><strong>{{ productsWithStock() }}</strong>
+  </article>
+</section>
+
+<section class="toolbar" aria-label="Filtros de stock">
+  <label
+    ><span>Buscar producto o SKU</span
+    ><input type="search" [value]="query()" (input)="updateQuery($event)" placeholder="Ej. INV-001"
+  /></label>
+  <button
+    mat-stroked-button
+    type="button"
+    [class.active]="onlyLowStock()"
+    (click)="toggleLowStock()"
+  >
+    {{ onlyLowStock() ? 'Mostrar todos' : 'Solo alertas' }}
+  </button>
+  <span>{{ filtered().length }} resultados</span>
+</section>
+
+<section class="stock-panel" [attr.aria-busy]="loading()" aria-live="polite">
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="34" />Calculando stock…</div>
+  } @else if (errorMessage()) {
+    <div class="state error">
+      <div>
+        <h2>No pudimos mostrar el stock</h2>
+        <p>{{ errorMessage() }}</p>
+      </div>
+      <button mat-stroked-button (click)="reload()">Reintentar</button>
+    </div>
+  } @else if (filtered().length === 0) {
+    <div class="state">
+      <div>
+        <h2>Sin resultados</h2>
+        <p>No hay productos que coincidan con el filtro.</p>
+      </div>
+    </div>
+  } @else {
+    <div class="stock-grid">
+      @for (item of filtered(); track item.productId) {
+        <article [class.low-stock]="item.lowStock">
+          <header>
+            <div>
+              <span class="sku">{{ item.sku }}</span>
+              <h2>{{ item.productName }}</h2>
+            </div>
+            @if (item.lowStock) {
+              <span class="badge">Stock mínimo</span>
+            }
+          </header>
+          <div class="balance">
+            <strong>{{ item.currentStock }}</strong
+            ><span>{{ item.unitCode }}</span>
+          </div>
+          <footer>
+            <span>Mínimo recomendado</span
+            ><strong>{{ item.minimumStock }} {{ item.unitCode }}</strong>
+          </footer>
+        </article>
+      }
+    </div>
+  }
+</section>
