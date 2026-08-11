@@ -1,0 +1,51 @@
+<header mat-dialog-title>
+  <p class="eyebrow">Registro #{{ entry.id }}</p>
+  <h2>{{ actionLabel(entry.action) }}</h2>
+</header>
+<mat-dialog-content>
+  <dl class="metadata">
+    <div>
+      <dt>Fecha</dt>
+      <dd>{{ entry.createdAt | date: 'medium' }}</dd>
+    </div>
+    <div>
+      <dt>Actor</dt>
+      <dd>{{ entry.username || 'Sistema / anónimo' }}</dd>
+    </div>
+    <div>
+      <dt>Entidad</dt>
+      <dd>{{ entry.entityName }}{{ entry.entityId ? ' #' + entry.entityId : '' }}</dd>
+    </div>
+    <div>
+      <dt>IP cliente</dt>
+      <dd>{{ entry.clientIp || 'No disponible' }}</dd>
+    </div>
+  </dl>
+  @if (entry.details) {
+    <section class="details">
+      <h3>Detalle</h3>
+      <p>{{ entry.details }}</p>
+    </section>
+  }
+  <section class="snapshots" aria-label="Comparación de cambios">
+    <article>
+      <h3>Antes</h3>
+      @if (before) {
+        <pre>{{ before }}</pre>
+      } @else {
+        <p>Sin instantánea anterior.</p>
+      }
+    </article>
+    <article>
+      <h3>Después</h3>
+      @if (after) {
+        <pre>{{ after }}</pre>
+      } @else {
+        <p>Sin instantánea posterior.</p>
+      }
+    </article>
+  </section>
+</mat-dialog-content>
+<mat-dialog-actions align="end"
+  ><button mat-flat-button mat-dialog-close>Cerrar</button></mat-dialog-actions
+>

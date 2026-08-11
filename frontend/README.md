@@ -80,13 +80,15 @@ src/app
 │   ├── realtime          # cliente STOMP y contrato de eventos
 │   └── services          # cliente REST y health
 ├── features
+│   ├── audit             # filtros, trazabilidad y comparación de cambios
 │   ├── auth              # login, contraseña obligatoria y acceso denegado
 │   ├── catalogs          # categorías, ubicaciones, unidades y proveedores
 │   ├── batches           # lotes, estados y cantidad protegida
 │   ├── dashboard         # indicadores, alertas y actividad real
 │   ├── movements         # entradas, salidas y ajustes auditables
 │   ├── products          # listado, filtros y mantenimiento de productos
-│   └── stock             # saldos agregados y mínimos
+│   ├── stock             # saldos agregados y mínimos
+│   └── users             # cuentas, roles y ciclo de credenciales
 ├── layout                # shell, topbar y navegación por rol
 └── shared                # componentes y modelos reutilizables
 ```
@@ -99,7 +101,9 @@ Lotes ofrece listado paginado, filtro por producto, alta, edición y gestión de
 
 Movimientos es el único módulo capaz de cambiar cantidades. Registra entradas, salidas y ajustes con los saldos anterior y posterior, responsable, lote, proveedor y motivo. Stock agrega esos saldos por producto y señala automáticamente los mínimos. Lotes, stock, movimientos y dashboard reaccionan a los eventos STOMP `STOCK_UPDATED` y vuelven a consultar al backend como fuente de verdad.
 
-Usuarios y auditoría mantienen placeholders explícitos hasta incorporar sus flujos funcionales.
+Usuarios separa consulta y administración por rol: `SUPERVISOR` puede consultar y `ADMIN` gestiona cuentas, roles, estado y contraseñas temporales. Cada mutación sensible revoca las sesiones activas del usuario afectado.
+
+Auditoría proporciona consulta paginada por acción, entidad, actor y rango temporal, además de un detalle legible de las instantáneas anterior y posterior. Es un módulo estrictamente de lectura.
 
 ## Límites actuales
 
@@ -107,4 +111,3 @@ Usuarios y auditoría mantienen placeholders explícitos hasta incorporar sus fl
 - Sin QR ni códigos de barras.
 - Sin recuperación autónoma de contraseña; la gestiona un administrador.
 - Sin edición directa de cantidades de lote; el stock cambia exclusivamente mediante movimientos.
-- Continúan pendientes las pantallas de usuarios y auditoría.

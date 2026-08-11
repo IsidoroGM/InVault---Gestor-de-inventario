@@ -1,0 +1,54 @@
+:host {
+  display: block;
+}
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: #315cc8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+h2 {
+  margin: 0;
+  color: #17223d;
+}
+.form-alert {
+  padding: 0.8rem 1rem;
+  border-radius: 0.7rem;
+  color: #8b2637;
+  background: #fff0f2;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 1rem;
+  padding-top: 0.5rem;
+}
+.full-width {
+  grid-column: 1 / -1;
+}
+.session-warning {
+  padding: 1rem;
+  border-radius: 0.8rem;
+  color: #5b4a20;
+  background: #fff7df;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+mat-dialog-content {
+  width: min(44rem, calc(100vw - 3rem));
+}
+button[mat-flat-button] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+@media (max-width: 620px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .full-width {
+    grid-column: auto;
+  }
+}

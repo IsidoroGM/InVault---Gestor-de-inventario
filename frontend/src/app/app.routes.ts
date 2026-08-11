@@ -2,11 +2,6 @@ import { Routes } from '@angular/router';
 
 import { authGuard, guestGuard, passwordPolicyGuard, roleGuard } from './core/auth/auth.guards';
 
-const placeholder = () =>
-  import('./shared/components/feature-placeholder/feature-placeholder.component').then(
-    (module) => module.FeaturePlaceholderComponent,
-  );
-
 export const routes: Routes = [
   {
     path: 'login',
@@ -93,7 +88,10 @@ export const routes: Routes = [
           title: 'Usuarios y roles',
           description: 'Gestión de cuentas con los roles oficiales de InVault.',
         },
-        loadComponent: placeholder,
+        loadComponent: () =>
+          import('./features/users/users-page.component').then(
+            (module) => module.UsersPageComponent,
+          ),
       },
       {
         path: 'audit',
@@ -105,7 +103,10 @@ export const routes: Routes = [
           title: 'Auditoría',
           description: 'Consulta paginada de acciones, actores y cambios antes/después.',
         },
-        loadComponent: placeholder,
+        loadComponent: () =>
+          import('./features/audit/audit-page.component').then(
+            (module) => module.AuditPageComponent,
+          ),
       },
       {
         path: 'forbidden',

@@ -1,0 +1,177 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Administración</p>
+    <h1>Usuarios y roles</h1>
+    <p class="lead">Cuentas, permisos y ciclo de credenciales con revocación de sesiones.</p>
+  </div>
+  @if (canManage()) {
+    <button mat-flat-button type="button" (click)="openCreate()">Nuevo usuario</button>
+  }
+</header>
+
+<section class="metrics" aria-label="Indicadores de usuarios">
+  <article>
+    <span>Cuentas totales</span><strong>{{ users().length }}</strong>
+  </article>
+  <article>
+    <span>Activas</span><strong>{{ activeCount() }}</strong>
+  </article>
+  <article [class.alert]="passwordPendingCount() > 0">
+    <span>Cambio de clave pendiente</span><strong>{{ passwordPendingCount() }}</strong>
+  </article>
+</section>
+
+<section class="filter-panel" aria-label="Filtros de usuarios">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"
+    ><mat-label>Buscar</mat-label
+    ><input
+      matInput
+      type="search"
+      [value]="query()"
+      (input)="updateQuery($event)"
+      placeholder="Usuario o correo"
+  /></mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"
+    ><mat-label>Estado</mat-label
+    ><mat-select [value]="activeFilter()" (selectionChange)="setActiveFilter($event.value)"
+      ><mat-option value="all">Todos</mat-option><mat-option value="active">Activos</mat-option
+      ><mat-option value="inactive">Inactivos</mat-option></mat-select
+    ></mat-form-field
+  >
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"
+    ><mat-label>Rol</mat-label
+    ><mat-select [value]="roleFilter()" (selectionChange)="setRoleFilter($event.value)"
+      ><mat-option value="all">Todos</mat-option>
+      @for (role of officialRoles; track role) {
+        <mat-option [value]="role">{{ roleLabel(role) }}</mat-option>
+      }
+    </mat-select></mat-form-field
+  >
+  <span>{{ filteredUsers().length }} usuarios</span>
+</section>
+
+<section class="data-panel" [attr.aria-busy]="loading()" aria-live="polite">
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="34" />Cargando usuarios…</div>
+  } @else if (errorMessage()) {
+    <div class="state error">
+      <div>
+        <h2>No pudimos mostrar los usuarios</h2>
+        <p>{{ errorMessage() }}</p>
+      </div>
+      <button mat-stroked-button (click)="reload()">Reintentar</button>
+    </div>
+  } @else if (filteredUsers().length === 0) {
+    <div class="state">
+      <div>
+        <h2>Sin resultados</h2>
+        <p>Ajusta los filtros o crea una cuenta nueva.</p>
+      </div>
+    </div>
+  } @else {
+    <div class="desktop-table">
+      <table mat-table [dataSource]="filteredUsers()">
+        <ng-container matColumnDef="user"
+          ><th mat-header-cell *matHeaderCellDef>Cuenta</th>
+          <td mat-cell *matCellDef="let user">
+            <strong>{{ user.username }}</strong
+            ><small>{{ user.email }}</small>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="roles"
+          ><th mat-header-cell *matHeaderCellDef>Roles</th>
+          <td mat-cell *matCellDef="let user">
+            <div class="role-list">
+              @for (role of user.roles; track role) {
+                <span>{{ roleLabel(role) }}</span>
+              }
+            </div>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="status"
+          ><th mat-header-cell *matHeaderCellDef>Estado</th>
+          <td mat-cell *matCellDef="let user">
+            <span class="status" [class.inactive]="!user.active">{{
+              user.active ? 'Activo' : 'Inactivo'
+            }}</span>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="security"
+          ><th mat-header-cell *matHeaderCellDef>Credenciales</th>
+          <td mat-cell *matCellDef="let user">
+            <span [class.pending]="user.mustChangePassword">{{
+              user.mustChangePassword ? 'Cambio pendiente' : 'Actualizadas'
+            }}</span>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="lastLogin"
+          ><th mat-header-cell *matHeaderCellDef>Último acceso</th>
+          <td mat-cell *matCellDef="let user">
+            {{ user.lastLoginAt ? (user.lastLoginAt | date: 'short') : 'Nunca' }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="actions"
+          ><th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let user">
+            @if (canManage()) {
+              <div class="row-actions">
+                <button mat-button (click)="openEdit(user)">Editar</button
+                ><button mat-button (click)="resetPassword(user)">Clave</button
+                ><button
+                  mat-button
+                  [disabled]="user.id === currentUserId()"
+                  (click)="changeLifecycle(user)"
+                >
+                  {{ user.active ? 'Desactivar' : 'Activar' }}
+                </button>
+              </div>
+            }
+          </td></ng-container
+        >
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    </div>
+    <div class="mobile-list">
+      @for (user of filteredUsers(); track user.id) {
+        <article>
+          <header>
+            <div>
+              <h2>{{ user.username }}</h2>
+              <span>{{ user.email }}</span>
+            </div>
+            <span class="status" [class.inactive]="!user.active">{{
+              user.active ? 'Activo' : 'Inactivo'
+            }}</span>
+          </header>
+          <div class="role-list">
+            @for (role of user.roles; track role) {
+              <span>{{ roleLabel(role) }}</span>
+            }
+          </div>
+          <p>
+            {{
+              user.mustChangePassword
+                ? 'Cambio de contraseña pendiente'
+                : 'Credenciales actualizadas'
+            }}
+            · {{ user.lastLoginAt ? (user.lastLoginAt | date: 'short') : 'Sin accesos' }}
+          </p>
+          @if (canManage()) {
+            <footer>
+              <button mat-button (click)="openEdit(user)">Editar</button
+              ><button mat-button (click)="resetPassword(user)">Clave</button
+              ><button
+                mat-button
+                [disabled]="user.id === currentUserId()"
+                (click)="changeLifecycle(user)"
+              >
+                {{ user.active ? 'Desactivar' : 'Activar' }}
+              </button>
+            </footer>
+          }
+        </article>
+      }
+    </div>
+  }
+</section>
