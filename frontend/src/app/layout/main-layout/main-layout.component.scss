@@ -1,0 +1,39 @@
+:host,
+mat-sidenav-container {
+  display: block;
+  min-height: 100dvh;
+}
+
+mat-sidenav {
+  width: 17rem;
+  border: 0;
+  border-radius: 0;
+}
+
+mat-sidenav-content {
+  min-height: 100dvh;
+  background: radial-gradient(circle at 100% 0%, rgb(73 117 220 / 8%), transparent 25rem), #f5f7fb;
+}
+
+main {
+  width: min(100%, 100rem);
+  margin: 0 auto;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1023.98px) {
+  mat-sidenav {
+    width: min(19rem, 86vw);
+  }
+
+  main {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 767px) {
+  main {
+    padding: 1rem;
+  }
+}

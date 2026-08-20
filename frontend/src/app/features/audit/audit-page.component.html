@@ -1,0 +1,156 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Trazabilidad</p>
+    <h1>Auditoría</h1>
+    <p class="lead">Registro cronológico e inmutable de accesos y cambios operativos.</p>
+  </div>
+</header>
+
+<form
+  class="filter-panel"
+  [formGroup]="filters"
+  (ngSubmit)="applyFilters()"
+  aria-label="Filtros de auditoría"
+>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"
+    ><mat-label>Acción</mat-label
+    ><mat-select formControlName="action"
+      ><mat-option [value]="null">Todas</mat-option>
+      @for (action of actions; track action) {
+        <mat-option [value]="action">{{ actionLabel(action) }}</mat-option>
+      }
+    </mat-select></mat-form-field
+  >
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"
+    ><mat-label>Entidad</mat-label
+    ><input matInput formControlName="entityName" maxlength="100" placeholder="Ej. User, Product"
+  /></mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"
+    ><mat-label>Actor</mat-label
+    ><mat-select formControlName="userId"
+      ><mat-option [value]="null">Todos</mat-option>
+      @for (user of users(); track user.id) {
+        <mat-option [value]="user.id">{{ user.username }}</mat-option>
+      }
+    </mat-select></mat-form-field
+  >
+  <label class="date-field"
+    ><span>Desde</span><input type="datetime-local" formControlName="from"
+  /></label>
+  <label class="date-field"
+    ><span>Hasta</span><input type="datetime-local" formControlName="to"
+  /></label>
+  <div class="filter-actions">
+    <button mat-flat-button type="submit" [disabled]="dateRangeInvalid()">Aplicar</button
+    ><button mat-button type="button" (click)="clearFilters()">Limpiar</button>
+  </div>
+  @if (dateRangeInvalid()) {
+    <p class="range-error" role="alert">La fecha inicial no puede ser posterior a la final.</p>
+  }
+</form>
+
+<section class="result-summary">
+  <span>{{ totalElements() }} registros</span><span>Ordenados del más reciente al más antiguo</span>
+</section>
+
+<section class="data-panel" [attr.aria-busy]="loading()" aria-live="polite">
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="34" />Cargando auditoría…</div>
+  } @else if (errorMessage()) {
+    <div class="state error">
+      <div>
+        <h2>No pudimos mostrar la auditoría</h2>
+        <p>{{ errorMessage() }}</p>
+      </div>
+      <button mat-stroked-button (click)="reload()">Reintentar</button>
+    </div>
+  } @else if (entries().length === 0) {
+    <div class="state">
+      <div>
+        <h2>Sin registros</h2>
+        <p>No hay eventos que coincidan con los filtros.</p>
+      </div>
+    </div>
+  } @else {
+    <div class="desktop-table">
+      <table mat-table [dataSource]="entries()">
+        <ng-container matColumnDef="date"
+          ><th mat-header-cell *matHeaderCellDef>Fecha</th>
+          <td mat-cell *matCellDef="let entry">
+            {{ entry.createdAt | date: 'short' }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="action"
+          ><th mat-header-cell *matHeaderCellDef>Acción</th>
+          <td mat-cell *matCellDef="let entry">
+            <span
+              class="action"
+              [class.security]="entry.action.includes('LOGIN') || entry.action.includes('PASSWORD')"
+              >{{ actionLabel(entry.action) }}</span
+            >
+          </td></ng-container
+        >
+        <ng-container matColumnDef="actor"
+          ><th mat-header-cell *matHeaderCellDef>Actor</th>
+          <td mat-cell *matCellDef="let entry">
+            <strong>{{ entry.username || 'Sistema / anónimo' }}</strong>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="entity"
+          ><th mat-header-cell *matHeaderCellDef>Entidad</th>
+          <td mat-cell *matCellDef="let entry">
+            <strong>{{ entry.entityName }}</strong
+            ><small>{{ entry.entityId ? '#' + entry.entityId : 'Sin identificador' }}</small>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="details"
+          ><th mat-header-cell *matHeaderCellDef>Detalle</th>
+          <td mat-cell *matCellDef="let entry">{{ entry.details || '—' }}</td></ng-container
+        >
+        <ng-container matColumnDef="ip"
+          ><th mat-header-cell *matHeaderCellDef>IP</th>
+          <td mat-cell *matCellDef="let entry">
+            <span class="ip">{{ entry.clientIp || '—' }}</span>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="actions"
+          ><th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let entry">
+            <button mat-button (click)="openDetail(entry)">Ver detalle</button>
+          </td></ng-container
+        >
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    </div>
+    <div class="mobile-list">
+      @for (entry of entries(); track entry.id) {
+        <article>
+          <header>
+            <span
+              class="action"
+              [class.security]="entry.action.includes('LOGIN') || entry.action.includes('PASSWORD')"
+              >{{ actionLabel(entry.action) }}</span
+            ><time>{{ entry.createdAt | date: 'short' }}</time>
+          </header>
+          <h2>{{ entry.entityName }}{{ entry.entityId ? ' #' + entry.entityId : '' }}</h2>
+          <p>{{ entry.details || 'Sin detalle' }}</p>
+          <footer>
+            <span
+              >{{ entry.username || 'Sistema / anónimo' }} ·
+              {{ entry.clientIp || 'IP no disponible' }}</span
+            ><button mat-button (click)="openDetail(entry)">Ver detalle</button>
+          </footer>
+        </article>
+      }
+    </div>
+    <mat-paginator
+      [length]="totalElements()"
+      [pageIndex]="pageIndex"
+      [pageSize]="pageSize"
+      [pageSizeOptions]="pageSizes"
+      showFirstLastButtons
+      (page)="pageChanged($event)"
+    />
+  }
+</section>

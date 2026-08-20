@@ -3,7 +3,10 @@ spring:
     name: invault-backend
 
   profiles:
-    active: dev
+    default: dev
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
   flyway:
     # Development keeps the pre-existing Hibernate-managed database compatible.
@@ -19,6 +22,9 @@ springdoc:
 
 server:
   port: 8080
+  shutdown: graceful
+  compression:
+    enabled: true
 
 invault:
   cors:
@@ -28,7 +34,7 @@ invault:
   security:
     jwt:
       issuer: ${INVAULT_JWT_ISSUER:https://api.invault.local}
-      expiration: 30m
+      expiration: ${INVAULT_JWT_EXPIRATION:30m}
     bootstrap-admin:
       enabled: ${INVAULT_BOOTSTRAP_ADMIN_ENABLED:false}
       username: ${INVAULT_BOOTSTRAP_ADMIN_USERNAME:}

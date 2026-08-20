@@ -1,0 +1,144 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Operación</p>
+    <h1>Movimientos de stock</h1>
+    <p class="lead">Único punto de modificación de cantidades, con usuario y saldos trazables.</p>
+  </div>
+  <div class="header-actions">
+    <a mat-stroked-button routerLink="/stock">Ver resumen</a>
+    @if (canManage()) {
+      <button mat-flat-button (click)="openCreate()">Registrar movimiento</button>
+    }
+  </div>
+</header>
+
+<section class="filter-panel" [formGroup]="filters" aria-label="Filtros de movimientos">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"
+    ><mat-label>Producto</mat-label
+    ><mat-select formControlName="productId"
+      ><mat-option [value]="null">Todos</mat-option>
+      @for (product of options().products; track product.id) {
+        <mat-option [value]="product.id">{{ product.sku }} · {{ product.name }}</mat-option>
+      }
+    </mat-select></mat-form-field
+  >
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"
+    ><mat-label>Tipo</mat-label
+    ><mat-select formControlName="movementType"
+      ><mat-option [value]="null">Todos</mat-option>
+      @for (type of movementTypes; track type) {
+        <mat-option [value]="type">{{ typeLabels[type] }}</mat-option>
+      }
+    </mat-select></mat-form-field
+  >
+  <button mat-button type="button" (click)="clearFilters()">Limpiar</button
+  ><span>{{ totalElements() }} movimientos</span>
+</section>
+
+<section class="data-panel" [attr.aria-busy]="loading()" aria-live="polite">
+  @if (loading()) {
+    <div class="state"><mat-spinner diameter="34" />Cargando movimientos…</div>
+  } @else if (errorMessage()) {
+    <div class="state error">
+      <div>
+        <h2>No pudimos mostrar los movimientos</h2>
+        <p>{{ errorMessage() }}</p>
+      </div>
+      <button mat-stroked-button (click)="reload()">Reintentar</button>
+    </div>
+  } @else if (movements().length === 0) {
+    <div class="state">
+      <div>
+        <h2>No hay movimientos</h2>
+        <p>Registra la primera entrada o ajusta los filtros.</p>
+      </div>
+    </div>
+  } @else {
+    <div class="desktop-table">
+      <table mat-table [dataSource]="movements()">
+        <ng-container matColumnDef="date"
+          ><th mat-header-cell *matHeaderCellDef>Fecha</th>
+          <td mat-cell *matCellDef="let item">
+            {{ item.movementDate | date: 'short' }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="type"
+          ><th mat-header-cell *matHeaderCellDef>Tipo</th>
+          <td mat-cell *matCellDef="let item">
+            <span
+              class="movement-type"
+              [class.negative]="direction(item.movementType) === 'negative'"
+              >{{ typeLabel(item.movementType) }}</span
+            >
+          </td></ng-container
+        >
+        <ng-container matColumnDef="product"
+          ><th mat-header-cell *matHeaderCellDef>Producto</th>
+          <td mat-cell *matCellDef="let item">
+            <strong>{{ item.productName }}</strong
+            ><small>{{ item.productSku }}</small>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="batch"
+          ><th mat-header-cell *matHeaderCellDef>Lote</th>
+          <td mat-cell *matCellDef="let item">
+            <span class="code">{{ item.batchCode }}</span>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="quantity"
+          ><th mat-header-cell *matHeaderCellDef>Cantidad</th>
+          <td mat-cell *matCellDef="let item">
+            <strong [class.negative-value]="direction(item.movementType) === 'negative'"
+              >{{ direction(item.movementType) === 'positive' ? '+' : '−'
+              }}{{ item.quantity }}</strong
+            >
+          </td></ng-container
+        >
+        <ng-container matColumnDef="balance"
+          ><th mat-header-cell *matHeaderCellDef>Saldo lote</th>
+          <td mat-cell *matCellDef="let item">
+            {{ item.previousBatchQuantity }} → <strong>{{ item.newBatchQuantity }}</strong>
+          </td></ng-container
+        >
+        <ng-container matColumnDef="user"
+          ><th mat-header-cell *matHeaderCellDef>Responsable</th>
+          <td mat-cell *matCellDef="let item">
+            <strong>{{ item.username }}</strong
+            ><small>{{ item.reason || item.supplierName || 'Sin detalle' }}</small>
+          </td></ng-container
+        >
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    </div>
+    <div class="mobile-list">
+      @for (item of movements(); track item.id) {
+        <article>
+          <header>
+            <div>
+              <span class="code">{{ item.batchCode }}</span>
+              <h2>{{ item.productName }}</h2>
+            </div>
+            <strong [class.negative-value]="direction(item.movementType) === 'negative'"
+              >{{ direction(item.movementType) === 'positive' ? '+' : '−'
+              }}{{ item.quantity }}</strong
+            >
+          </header>
+          <p>
+            {{ typeLabel(item.movementType) }} · {{ item.previousBatchQuantity }} →
+            {{ item.newBatchQuantity }}
+          </p>
+          <small>{{ item.movementDate | date: 'short' }} · {{ item.username }}</small>
+        </article>
+      }
+    </div>
+    <mat-paginator
+      [length]="totalElements()"
+      [pageIndex]="pageIndex"
+      [pageSize]="pageSize"
+      [pageSizeOptions]="pageSizes"
+      showFirstLastButtons
+      (page)="pageChanged($event)"
+    />
+  }
+</section>

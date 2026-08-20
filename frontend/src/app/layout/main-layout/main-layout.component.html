@@ -1,0 +1,19 @@
+<mat-sidenav-container>
+  <mat-sidenav
+    #drawer
+    [mode]="compact() ? 'over' : 'side'"
+    [opened]="!compact()"
+    [fixedInViewport]="compact()"
+    aria-label="Secciones de InVault"
+  >
+    <app-navigation (navigated)="compact() && drawer.close()" />
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <app-topbar [compact]="compact()" (menuToggle)="drawer.toggle()" (logoutRequested)="logout()" />
+    <app-pwa-status-bar />
+    <main id="main-content" tabindex="-1">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -1,0 +1,152 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Configuración</p>
+    <h1>Catálogos</h1>
+    <p class="lead">Administra los datos maestros que estructuran el inventario.</p>
+  </div>
+  @if (canManage() && !loading() && !errorMessage()) {
+    <button mat-flat-button type="button" (click)="openCreate()">
+      {{ currentDefinition().newLabel }}
+    </button>
+  }
+</header>
+
+<mat-tab-group
+  class="catalog-tabs"
+  [selectedIndex]="selectedIndex()"
+  (selectedIndexChange)="selectTab($event)"
+  animationDuration="180ms"
+>
+  @for (definition of definitions; track definition.kind) {
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <span>{{ definition.plural }}</span>
+        <span class="tab-count">{{ count(definition.kind) }}</span>
+      </ng-template>
+    </mat-tab>
+  }
+</mat-tab-group>
+
+<section class="catalog-context">
+  <div>
+    <h2>{{ currentDefinition().plural }}</h2>
+    <p>{{ currentDefinition().description }}</p>
+  </div>
+  <span>{{ currentItems().length }} visibles</span>
+</section>
+
+<section class="filter-panel" aria-label="Filtros del catálogo" [formGroup]="filters">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search-field">
+    <mat-label>Buscar en {{ currentDefinition().plural.toLocaleLowerCase() }}</mat-label>
+    <input
+      matInput
+      formControlName="query"
+      placeholder="Nombre, código o contacto"
+      autocomplete="off"
+    />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Estado</mat-label>
+    <mat-select formControlName="active">
+      <mat-option value="all">Todos</mat-option>
+      <mat-option value="active">Activos</mat-option>
+      <mat-option value="inactive">Inactivos</mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  <button mat-button type="button" (click)="clearFilters()">Limpiar filtros</button>
+</section>
+
+<section class="catalog-panel" aria-live="polite" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <div class="loading-state">
+      <mat-spinner diameter="34" />
+      <span>Cargando catálogos…</span>
+    </div>
+  } @else if (errorMessage()) {
+    <div class="message-state error-state" role="alert">
+      <div>
+        <h2>No pudimos mostrar los catálogos</h2>
+        <p>{{ errorMessage() }}</p>
+      </div>
+      <button mat-stroked-button type="button" (click)="reload()">Reintentar</button>
+    </div>
+  } @else if (currentItems().length === 0) {
+    <div class="message-state">
+      <div>
+        <h2>No hay registros que coincidan</h2>
+        <p>Prueba con otros términos o cambia el filtro de estado.</p>
+      </div>
+      <button mat-stroked-button type="button" (click)="clearFilters()">Ver todos</button>
+    </div>
+  } @else {
+    <div class="catalog-grid">
+      @for (item of currentItems(); track item.id) {
+        <article class="catalog-card">
+          <header>
+            <div>
+              @if (currentDefinition().kind === 'units') {
+                <span class="technical-code">{{ unit(item).code }}</span>
+              }
+              <h3>{{ item.name }}</h3>
+            </div>
+            <span class="status" [class.inactive]="!item.active">
+              {{ item.active ? 'Activo' : 'Inactivo' }}
+            </span>
+          </header>
+
+          @switch (currentDefinition().kind) {
+            @case ('units') {
+              <p>{{ unit(item).description || 'Sin descripción' }}</p>
+              <dl>
+                <div>
+                  <dt>Símbolo</dt>
+                  <dd>{{ unit(item).symbol || '—' }}</dd>
+                </div>
+              </dl>
+            }
+            @case ('suppliers') {
+              <dl>
+                <div>
+                  <dt>Contacto</dt>
+                  <dd>{{ supplier(item).contactName || '—' }}</dd>
+                </div>
+                <div>
+                  <dt>Teléfono</dt>
+                  <dd>{{ supplier(item).phone || '—' }}</dd>
+                </div>
+                <div>
+                  <dt>Correo</dt>
+                  <dd>{{ supplier(item).email || '—' }}</dd>
+                </div>
+              </dl>
+              @if (supplier(item).notes) {
+                <p>{{ supplier(item).notes }}</p>
+              }
+            }
+            @default {
+              <p>{{ unit(item).description || 'Sin descripción' }}</p>
+            }
+          }
+
+          @if (canManage()) {
+            <footer>
+              <button mat-button type="button" (click)="openEdit(item)">Editar</button>
+              @if (item.active) {
+                <button
+                  mat-button
+                  type="button"
+                  class="danger-action"
+                  (click)="confirmDeactivate(item)"
+                >
+                  Desactivar
+                </button>
+              }
+            </footer>
+          }
+        </article>
+      }
+    </div>
+  }
+</section>

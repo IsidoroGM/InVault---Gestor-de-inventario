@@ -1,0 +1,101 @@
+<header mat-dialog-title>
+  <p class="eyebrow">Operación auditable</p>
+  <h2>Registrar movimiento</h2>
+</header>
+
+<mat-dialog-content>
+  @if (errorMessage()) {
+    <p class="form-alert" role="alert">{{ errorMessage() }}</p>
+  }
+  <form id="movement-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Producto</mat-label>
+        <mat-select formControlName="productId">
+          @for (product of data.products; track product.id) {
+            <mat-option [value]="product.id">{{ product.sku }} · {{ product.name }}</mat-option>
+          }
+        </mat-select>
+        @if (serverError('productId'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        } @else if (form.controls.productId.hasError('required')) {
+          <mat-error>Selecciona un producto.</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Lote</mat-label>
+        <mat-select formControlName="batchId">
+          @for (batch of batches(); track batch.id) {
+            <mat-option [value]="batch.id" [disabled]="batchDisabled(batch)">
+              {{ batch.batchCode }} · {{ batch.quantity }} · {{ batch.status }}
+            </mat-option>
+          }
+        </mat-select>
+        <mat-hint>{{
+          loadingBatches() ? 'Cargando lotes…' : 'Los lotes bloqueados o inactivos no son operables'
+        }}</mat-hint>
+        @if (serverError('batchId'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        } @else if (form.controls.batchId.hasError('required')) {
+          <mat-error>Selecciona un lote.</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Tipo</mat-label>
+        <mat-select formControlName="movementType">
+          @for (type of movementTypes; track type) {
+            <mat-option [value]="type">{{ typeLabels[type] }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Cantidad</mat-label>
+        <input matInput type="number" min="0.001" step="0.001" formControlName="quantity" />
+        @if (serverError('quantity'); as message) {
+          <mat-error>{{ message }}</mat-error>
+        } @else if (form.controls.quantity.invalid) {
+          <mat-error>Indica una cantidad mayor que cero.</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Proveedor (opcional)</mat-label>
+        <mat-select formControlName="supplierId">
+          <mat-option [value]="null">Sin proveedor</mat-option>
+          @for (supplier of data.suppliers; track supplier.id) {
+            <mat-option [value]="supplier.id">{{ supplier.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Motivo</mat-label>
+      <textarea matInput rows="3" maxlength="255" formControlName="reason"></textarea>
+      <mat-hint align="end">{{ form.controls.reason.value.length }}/255</mat-hint>
+      @if (serverError('reason'); as message) {
+        <mat-error>{{ message }}</mat-error>
+      }
+    </mat-form-field>
+
+    <aside class="balance-preview" aria-live="polite">
+      <strong>Saldo actual del lote: {{ selectedBatch()?.quantity ?? '—' }}</strong>
+      <span>El nuevo saldo lo calcula el servidor y queda asociado a tu usuario.</span>
+    </aside>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="submitting()">
+    Cancelar
+  </button>
+  <button mat-flat-button type="submit" form="movement-form" [disabled]="submitting()">
+    @if (submitting()) {
+      <mat-spinner diameter="18" />
+    }
+    {{ submitting() ? 'Registrando…' : 'Registrar movimiento' }}
+  </button>
+</mat-dialog-actions>

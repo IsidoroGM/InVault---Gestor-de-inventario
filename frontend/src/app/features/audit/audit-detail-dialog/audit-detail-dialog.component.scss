@@ -1,0 +1,91 @@
+:host {
+  display: block;
+}
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: #315cc8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+h2 {
+  margin: 0;
+  color: #17223d;
+}
+mat-dialog-content {
+  width: min(62rem, calc(100vw - 3rem));
+}
+.metadata {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 0 0 1rem;
+}
+.metadata div {
+  padding: 0.8rem;
+  border: 1px solid #e0e6ef;
+  border-radius: 0.7rem;
+}
+dt {
+  color: #7a8599;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+dd {
+  margin: 0.25rem 0 0;
+  color: #25334e;
+  font-weight: 700;
+}
+.details {
+  padding: 0.9rem 1rem;
+  border-radius: 0.7rem;
+  background: #f3f6fb;
+}
+h3 {
+  margin: 0 0 0.5rem;
+  color: #34415b;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+.details p {
+  margin: 0;
+  color: #5e6b81;
+}
+.snapshots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.snapshots article {
+  min-width: 0;
+}
+.snapshots pre {
+  overflow: auto;
+  max-height: 24rem;
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0.7rem;
+  color: #d9e4fb;
+  background: #17223d;
+  font:
+    0.75rem/1.55 ui-monospace,
+    Consolas,
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.snapshots p {
+  padding: 1rem;
+  border: 1px dashed #ced6e3;
+  border-radius: 0.7rem;
+  color: #7a8599;
+}
+@media (max-width: 760px) {
+  .metadata,
+  .snapshots {
+    grid-template-columns: 1fr;
+  }
+}

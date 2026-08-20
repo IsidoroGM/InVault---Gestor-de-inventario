@@ -1,0 +1,59 @@
+:host {
+  display: block;
+}
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: #315cc8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+h2 {
+  margin: 0;
+  color: #17223d;
+}
+.form-alert {
+  padding: 0.8rem 1rem;
+  border-radius: 0.7rem;
+  color: #8b2637;
+  background: #fff0f2;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 1rem;
+  padding-top: 0.5rem;
+}
+.full-width {
+  width: 100%;
+}
+.balance-preview {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 0.8rem;
+  color: #31506f;
+  background: #edf5ff;
+}
+.balance-preview span {
+  color: #65758b;
+  font-size: 0.82rem;
+}
+mat-dialog-content {
+  width: min(46rem, calc(100vw - 3rem));
+}
+button[mat-flat-button] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+@media (max-width: 620px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .balance-preview {
+    flex-direction: column;
+  }
+}

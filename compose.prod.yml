@@ -1,0 +1,142 @@
+name: invault
+
+services:
+  database:
+    image: mysql:8.4.11
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:?Set DB_NAME in .env}
+      MYSQL_USER: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping --host=localhost --user=root --password=$${MYSQL_ROOT_PASSWORD} --silent",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - data
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:?Set DB_NAME in .env}
+      DB_USERNAME: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_SSL_MODE: DISABLED
+      DB_ALLOW_PUBLIC_KEY_RETRIEVAL: "true"
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-10}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-2}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-30000}
+      INVAULT_CORS_ALLOWED_ORIGINS: ${APP_PUBLIC_URL:?Set APP_PUBLIC_URL in .env}
+      INVAULT_REALTIME_ALLOWED_ORIGINS: ${APP_PUBLIC_URL:?Set APP_PUBLIC_URL in .env}
+      INVAULT_JWT_SECRET: ${INVAULT_JWT_SECRET:?Set INVAULT_JWT_SECRET in .env}
+      INVAULT_JWT_ISSUER: ${INVAULT_JWT_ISSUER:?Set INVAULT_JWT_ISSUER in .env}
+      INVAULT_JWT_EXPIRATION: ${INVAULT_JWT_EXPIRATION:-30m}
+      INVAULT_BOOTSTRAP_ADMIN_ENABLED: ${INVAULT_BOOTSTRAP_ADMIN_ENABLED:-false}
+      INVAULT_BOOTSTRAP_ADMIN_USERNAME: ${INVAULT_BOOTSTRAP_ADMIN_USERNAME:-}
+      INVAULT_BOOTSTRAP_ADMIN_EMAIL: ${INVAULT_BOOTSTRAP_ADMIN_EMAIL:-}
+      INVAULT_BOOTSTRAP_ADMIN_PASSWORD: ${INVAULT_BOOTSTRAP_ADMIN_PASSWORD:-}
+    depends_on:
+      database:
+        condition: service_healthy
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "http://localhost:8080/actuator/health",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks:
+      - data
+      - edge
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,mode=0755
+      - /var/run:size=1m,mode=0755
+    networks:
+      - edge
+    security_opt:
+      - no-new-privileges:true
+
+  gateway:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env}
+    depends_on:
+      frontend:
+        condition: service_healthy
+    ports:
+      - "${HTTPS_BIND_ADDRESS:-0.0.0.0}:80:80"
+      - "${HTTPS_BIND_ADDRESS:-0.0.0.0}:443:443"
+      - "${HTTPS_BIND_ADDRESS:-0.0.0.0}:443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  mysql-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  data:
+    internal: true
+  edge:
