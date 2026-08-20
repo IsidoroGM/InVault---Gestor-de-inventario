@@ -1,5 +1,41 @@
 # InVault production deployment
 
+## HTTPS preview without a domain
+
+For tablet and desktop acceptance testing, Windows with Docker Desktop can expose the
+complete stack through a temporary Cloudflare Quick Tunnel. It does not require a
+Cloudflare account, a domain, inbound ports or router configuration.
+
+From PowerShell at the repository root, run:
+
+```powershell
+.\deploy\start-preview.ps1 -AcceptPublicExposure
+```
+
+The script creates the ignored `.env.preview` file with random local secrets, builds
+the application, starts MySQL/backend/frontend, obtains a random
+`https://*.trycloudflare.com` URL and configures CORS, JWT and STOMP for that exact
+origin. It then prints the URL and initial administrator credentials. Change the
+administrator password at first login.
+
+The confirmation switch is required because the generated URL is reachable from the
+public Internet. The preview uses its own Docker project and database volume; only
+enter disposable test data and do not share the URL or credentials.
+
+Open the printed URL on the Windows computer and on each physical device, then follow
+[`PWA_ACCEPTANCE.md`](PWA_ACCEPTANCE.md). Docker Desktop and the `cloudflared`
+container must remain running during the test. The public hostname may change after
+the tunnel container is recreated; rerunning the script updates the backend origin.
+
+Stop the preview without deleting its MySQL volume or secrets:
+
+```powershell
+.\deploy\stop-preview.ps1
+```
+
+Quick Tunnels are disposable development infrastructure, not production hosting.
+They provide no uptime guarantee and must not be used for real inventory data.
+
 This deployment targets one Linux host with Docker Engine and the Docker Compose plugin. It runs four isolated services:
 
 - `gateway`: Caddy 2, the only public service; obtains and renews TLS certificates and proxies WebSocket traffic.
@@ -66,7 +102,7 @@ The final `down` command stops and removes containers and networks but preserves
 
 ## Production boundaries
 
-- The Compose database connection disables TLS because it stays on a private, internal Docker network. External managed MySQL deployments should omit that override and use the profile default `DB_SSL_MODE=REQUIRED`.
+- The Compose database connection disables TLS and permits MySQL public-key retrieval because it stays on a private, internal Docker network. External managed MySQL deployments should omit both overrides and use the profile defaults `DB_SSL_MODE=REQUIRED` and `DB_ALLOW_PUBLIC_KEY_RETRIEVAL=false`.
 - Horizontal backend scaling is not supported while the in-memory STOMP broker is in use.
 - Image publication, remote host credentials, DNS and TLS certificates are environment-specific and intentionally remain outside the repository.
 - Caddy terminates TLS, forwards `Host`, `X-Forwarded-For` and `X-Forwarded-Proto`, supports the STOMP WebSocket upgrade and adds HSTS.
