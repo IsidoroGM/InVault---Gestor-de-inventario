@@ -84,14 +84,17 @@ The host must accept inbound TCP traffic on ports 80 and 443 and UDP traffic on 
 
 ## Updates
 
-Back up the database, fetch the desired release, then rebuild. Flyway applies pending migrations before the backend becomes healthy.
+Back up the company database, fetch the desired release, then rebuild that same
+company project. Flyway applies pending migrations before the backend becomes healthy.
+Using a [generated company configuration](COMPANY_DEPLOYMENTS.md):
 
 ```bash
-docker compose --env-file .env --file compose.prod.yml exec -T database \
-  sh -c 'exec mysqldump --single-transaction --user=root --password="$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
-  > "invault-$(date +%Y%m%d-%H%M%S).sql"
-docker compose --env-file .env --file compose.prod.yml up --detach --build
-docker compose --env-file .env --file compose.prod.yml ps
+pwsh -NoProfile -NonInteractive -File ./deploy/backup-company.ps1 \
+  -CompanyId company-a -EnvironmentFile .env.company-company-a \
+  -RecipientFile /etc/invault/backup-recipients.txt \
+  -OutputDirectory /var/backups/invault/company-a
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml up --detach --build
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml ps
 ```
 
 Do not use `docker compose down --volumes` in production: it deletes the MySQL volume. Use [encrypted per-company backups and isolated recovery](BACKUPS.md), store copies outside the host and periodically test restoration.

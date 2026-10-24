@@ -432,7 +432,7 @@ The following items are not part of the current implementation or remain recomme
 - Add coverage thresholds, backend/image dependency scanning, and static application security testing. Frontend CI already audits npm dependencies.
 - Replace the in-memory STOMP broker before horizontally scaling the backend.
 - Introduce per-device sessions if global user token revocation is too coarse for future requirements.
-- Add backup automation and periodically verified restoration procedures for production.
+- Activate per-company backup timers, external replicas and recovery acceptance on the production hosts; encrypted backup and isolated restoration scripts are already verified in CI.
 - Add CSV/Excel import and export, advanced reporting, notifications, and multi-warehouse support.
 - Add QR/barcode workflows.
 - Add explicitly designed offline data synchronization only if the business accepts its conflict and freshness model. The current PWA intentionally does not queue offline mutations.
