@@ -31,7 +31,8 @@ function Complete-BackupProcess {
     $output = if ($Running.OutputTask) { $Running.OutputTask.GetAwaiter().GetResult() } else { '' }
     if ($Running.Process.ExitCode -ne 0) {
         # Native stderr may contain SQL or environment values. Do not put it in scheduled logs.
-        throw "$Operation failed (exit $($Running.Process.ExitCode)); no backup/recovery is published."
+        $diagnostic = if ($errorText -match 'ERROR\s+(\d+)(?:\s+\(([A-Z0-9]+)\))?') { " MySQL error $($Matches[1])." } else { '' }
+        throw "$Operation failed (exit $($Running.Process.ExitCode)).$diagnostic No backup/recovery is published."
     }
     return $output
 }

@@ -19,7 +19,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "mysqladmin ping --host=localhost --user=root --password=$${MYSQL_ROOT_PASSWORD} --silent",
+          'MYSQL_PWD="$${MYSQL_PASSWORD}" mysql --protocol=TCP --host=127.0.0.1 --user="$${MYSQL_USER}" --database="$${MYSQL_DATABASE}" --batch --skip-column-names --execute="SELECT 1"',
         ]
       interval: 10s
       timeout: 5s
