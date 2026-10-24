@@ -35,6 +35,9 @@ Test tablet layouts in portrait and landscape. Record the device, OS version, br
 - [ ] Create or select catalogues and create a product.
 - [ ] Create a batch and confirm that its quantity is read-only.
 - [ ] Editing an existing batch keeps its product fixed, including when its balance is zero.
+- [ ] A unit used by a product keeps its code/name/symbol while allowing description/status edits.
+- [ ] A product with batches keeps its unit even after every batch reaches zero stock.
+- [ ] Editing other product details still displays and retains its existing inactive unit.
 - [ ] A product with more than 100 batches can use a batch beyond the first 100 in a movement.
 - [ ] Register an inbound stock movement and verify batch, stock and dashboard values.
 - [ ] Register an outbound movement and verify the same values again.

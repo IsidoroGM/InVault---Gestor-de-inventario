@@ -62,6 +62,38 @@ describe('CatalogFormDialogComponent', () => {
     expect(testable.form.controls['name'].touched).toBe(true);
   });
 
+  it('keeps an existing locked identity exactly while saving a description', async () => {
+    const unit: UnitCatalogItem = {
+      ...savedUnit,
+      code: 'kg',
+      symbol: 'kg',
+      description: null,
+      identityLocked: true,
+      active: true,
+    };
+    const component = (await createComponent({
+      kind: 'units',
+      item: unit,
+    })) as unknown as TestableCatalogFormDialog;
+    expect(component.form.controls['code'].disabled).toBe(true);
+    expect(component.form.controls['name'].disabled).toBe(true);
+    expect(component.form.controls['symbol'].disabled).toBe(true);
+    component.form.patchValue({
+      code: 'L',
+      name: 'Litro',
+      symbol: 'L',
+      description: 'Descripción revisada',
+    });
+    component.submit();
+    expect(service.update).toHaveBeenCalledWith('units', 5, {
+      code: 'kg',
+      name: 'Kilogramo',
+      symbol: 'kg',
+      description: 'Descripción revisada',
+      active: true,
+    });
+  });
+
   async function createComponent(data: CatalogFormDialogData): Promise<CatalogFormDialogComponent> {
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({

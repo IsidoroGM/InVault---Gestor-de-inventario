@@ -20,6 +20,16 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "units")
 public class Unit {
+    @Column(name = "identity_locked", nullable = false)
+    private boolean identityLocked;
+
+    public boolean isIdentityLocked() {
+        return identityLocked;
+    }
+
+    public void lockIdentity() {
+        identityLocked = true;
+    }
 
     // Primary key generated automatically by the database.
     @Id

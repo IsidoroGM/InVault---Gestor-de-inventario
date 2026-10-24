@@ -9,6 +9,10 @@ import java.time.LocalDateTime;
  * It allows us to control exactly which fields are exposed.
  */
 public class UnitResponseDTO {
+    private boolean identityLocked;
+
+    public boolean isIdentityLocked() { return identityLocked; }
+    public void setIdentityLocked(boolean value) { identityLocked = value; }
 
     private Long id;
     private String code;

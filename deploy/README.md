@@ -89,6 +89,12 @@ Each company's database persists account and source-IP login budgets. Defaults a
 The PWA shows the server's retry delay. See [`LOGIN_SECURITY.md`](LOGIN_SECURITY.md)
 for tuning, audit events, proxy trust and the disposable full-stack smoke test.
 
+## Measurement identity
+
+Units used by products and units assigned to products with batches are protected
+against relabelling. See [`MEASUREMENT_IDENTITY.md`](MEASUREMENT_IDENTITY.md) for
+permitted edits, permanent flags, concurrent creation and the V6 rollout.
+
 ## Updates
 
 Back up the company database, fetch the desired release, then rebuild that same

@@ -94,6 +94,8 @@ JSON_OBJECT('id',1,'productId',1,'productSku','BACKUP-001','productName','Aceite
 'movementDate',(SELECT DATE_FORMAT(movement_date,'%Y-%m-%dT%H:%i:%s.%f') FROM stock_movements WHERE id=1)),NOW(6));
 INSERT INTO login_rate_limits (id, attempts, window_expires_at, reported)
 VALUES (CONCAT('account:',SHA2('user:1',256)),2,2000000000000,TRUE);
+UPDATE units SET identity_locked = TRUE WHERE id = 1;
+UPDATE products SET unit_locked = TRUE WHERE id = 1;
 '@
     $commit = 'a' * 40
     if ($MySqlHome) {
@@ -145,8 +147,8 @@ VALUES (CONCAT('account:',SHA2('user:1',256)),2,2000000000000,TRUE);
         $inspect = (Invoke-BackupCommand @{File='docker'; Arguments=@('inspect', $container)} | ConvertFrom-Json)[0]
         Assert-True ($inspect.HostConfig.NetworkMode -eq 'none') 'Recovery container has network access.'
     }
-    $check = (Invoke-BackupCommand (Client-Command $target "SELECT quantity FROM batches; SELECT COUNT(*) FROM stock_movements; SELECT after_data FROM audit_logs; SELECT token_version FROM users; SELECT name FROM products; SELECT JSON_EXTRACT(response_body, '$.newBatchQuantity') FROM stock_movement_requests; SELECT CONCAT(attempts, ':', window_expires_at, ':', reported) FROM login_rate_limits;")).Trim() -split '\r?\n'
-    $expected = @('10.125', '1', '{"quantity":10.125}', '7', 'Aceite áéí', '10.125', '2:2000000000000:1')
+    $check = (Invoke-BackupCommand (Client-Command $target "SELECT quantity FROM batches; SELECT COUNT(*) FROM stock_movements; SELECT after_data FROM audit_logs; SELECT token_version FROM users; SELECT name FROM products; SELECT JSON_EXTRACT(response_body, '$.newBatchQuantity') FROM stock_movement_requests; SELECT CONCAT(attempts, ':', window_expires_at, ':', reported) FROM login_rate_limits; SELECT CONCAT(u.identity_locked, ':', p.unit_locked) FROM products p JOIN units u ON p.unit_id = u.id;")).Trim() -split '\r?\n'
+    $expected = @('10.125', '1', '{"quantity":10.125}', '7', 'Aceite áéí', '10.125', '2:2000000000000:1', '1:1')
     Assert-True ($check.Count -eq $expected.Count) 'Unexpected recovered query result count.'
     for ($index = 0; $index -lt $expected.Count; $index++) {
         Assert-True ($check[$index] -ceq $expected[$index]) "Recovered value $index does not match the source snapshot."

@@ -53,6 +53,7 @@ export interface NamedCatalogItem extends BaseCatalogItem {
 }
 
 export interface UnitCatalogItem extends NamedCatalogItem {
+  readonly identityLocked?: boolean;
   readonly code: string;
   readonly symbol: string | null;
 }

@@ -74,7 +74,8 @@ public class BatchService {
     }
 
     public BatchResponseDTO create(BatchRequestDTO requestDTO) {
-        Product product = findActiveProductById(requestDTO.getProductId());
+        Product product = findActiveProductById(requestDTO.getProductId(), true);
+        product.lockUnit();
 
         String normalizedBatchCode = normalizeBatchCode(requestDTO.getBatchCode());
 
@@ -144,11 +145,15 @@ public class BatchService {
     }
 
     private Product findActiveProductById(Long productId) {
+        return findActiveProductById(productId, false);
+    }
+
+    private Product findActiveProductById(Long productId, boolean lock) {
         if (productId == null) {
             throw new BadRequestException("Product id is required.");
         }
 
-        Product product = productRepository.findById(productId)
+        Product product = (lock ? productRepository.findByIdForUpdate(productId) : productRepository.findById(productId))
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
         if (Boolean.FALSE.equals(product.getActive())) {

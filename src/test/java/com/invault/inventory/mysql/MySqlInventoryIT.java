@@ -79,7 +79,7 @@ class MySqlInventoryIT {
         var company = database.createCompany("fresh");
         try (var app = company.start()) {
             JdbcTemplate jdbc = company.jdbc();
-            assertEquals(5, jdbc.queryForObject(
+            assertEquals(6, jdbc.queryForObject(
                     "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1", Integer.class));
             assertEquals(13, jdbc.queryForObject("""
                     SELECT COUNT(*) FROM information_schema.tables
@@ -105,7 +105,7 @@ class MySqlInventoryIT {
                 VALUES ('legacy', 'legacy@example.test', 'legacy-hash', TRUE, FALSE, CURRENT_TIMESTAMP(6))
                 """);
         Flyway current = Flyway.configure().dataSource(jdbc.getDataSource()).load();
-        assertEquals(4, current.migrate().migrationsExecuted);
+        assertEquals(5, current.migrate().migrationsExecuted);
         assertEquals("legacy-hash", jdbc.queryForObject(
                 "SELECT password_hash FROM users WHERE username = 'legacy'", String.class));
         assertEquals(0L, jdbc.queryForObject("SELECT token_version FROM users WHERE username = 'legacy'", Long.class));

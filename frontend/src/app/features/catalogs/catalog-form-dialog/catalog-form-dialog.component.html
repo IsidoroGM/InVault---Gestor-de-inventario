@@ -10,11 +10,19 @@
 
   <form id="catalog-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
     @if (data.kind === 'units') {
+      @if (identityLocked) {
+        <p>
+          Esta unidad ya se utiliza en productos. Su código, nombre y símbolo se conservan. Para
+          otra medida, crea una unidad nueva.
+        </p>
+      }
       <div class="form-grid unit-grid">
         <mat-form-field appearance="outline">
           <mat-label>Código</mat-label>
           <input matInput formControlName="code" maxlength="30" autocomplete="off" />
-          <mat-hint>Se guardará en mayúsculas</mat-hint>
+          @if (!identityLocked) {
+            <mat-hint>Se guardará en mayúsculas</mat-hint>
+          }
           @if (serverError('code'); as message) {
             <mat-error>{{ message }}</mat-error>
           } @else if (form.controls.code.hasError('required')) {

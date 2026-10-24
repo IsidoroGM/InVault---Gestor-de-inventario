@@ -73,10 +73,18 @@
       <mat-form-field appearance="outline">
         <mat-label>Unidad</mat-label>
         <mat-select formControlName="unitId">
+          @if (currentUnitMissing && data.product; as product) {
+            <mat-option [value]="product.unitId"
+              >{{ product.unitName }} ({{ product.unitSymbol }})</mat-option
+            >
+          }
           @for (unit of data.catalogs.units; track unit.id) {
             <mat-option [value]="unit.id">{{ unit.name }} ({{ unit.symbol }})</mat-option>
           }
         </mat-select>
+        @if (unitLocked) {
+          <mat-hint>El producto ya tiene lotes. Para otra medida, crea un producto nuevo.</mat-hint>
+        }
         @if (serverError('unitId'); as message) {
           <mat-error>{{ message }}</mat-error>
         } @else if (form.controls.unitId.hasError('required')) {

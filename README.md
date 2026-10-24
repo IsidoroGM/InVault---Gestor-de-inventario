@@ -154,7 +154,7 @@ Additional safeguards prevent users from deactivating themselves or removing/dea
 │   ├── audit, realtime, config, common
 │   └── InVaultBackendApplication.java
 ├── src/main/resources
-│   ├── db/migration                 # Flyway V1-V5
+│   ├── db/migration                 # Flyway V1-V6
 │   ├── application.yml
 │   ├── application-dev.example.yml
 │   └── application-prod.yml
@@ -329,6 +329,7 @@ Production uses Flyway as the schema authority and Hibernate in validation mode:
 | `V3__add_user_token_version.sql`  | Adds the token version used for immediate JWT revocation.                                                        |
 | `V4__add_stock_movement_requests.sql` | Stores movement request fingerprints and committed responses for safe retries. |
 | `V5__add_login_rate_limits.sql` | Persists per-account/source login budgets across restarts and backend instances. |
+| `V6__preserve_measurement_identity.sql` | Backfills and persists unit identity/product measurement locks. |
 
 The application schema contains `roles`, `users`, `user_roles`, `units`, `categories`, `locations`, `suppliers`, `products`, `batches`, `stock_movements`, `audit_logs`, `stock_movement_requests`, and `login_rate_limits`, plus Flyway's technical history table.
 
@@ -339,6 +340,10 @@ minutes by default). A rejected request returns HTTP 429 with `Retry-After`; the
 PWA displays a countdown and requires an explicit retry. Successful logins also
 consume the budget. See [login security](deploy/LOGIN_SECURITY.md) for configuration,
 audit, proxy trust and production-chain verification.
+
+Once used by a product, a unit keeps its code, name and symbol. Once a product
+has a batch, it keeps its unit even when stock returns to zero. Forms reflect
+these persisted rules; see [measurement identity](deploy/MEASUREMENT_IDENTITY.md).
 
 ## Production deployment
 

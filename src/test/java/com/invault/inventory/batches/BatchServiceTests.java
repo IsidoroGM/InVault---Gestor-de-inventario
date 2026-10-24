@@ -82,7 +82,7 @@ class BatchServiceTests {
         batch.setQuantity(new BigDecimal("25.000"));
         BatchResponseDTO responseDTO = new BatchResponseDTO();
 
-        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
         when(batchRepository.findByBatchCodeIgnoreCase("LOT-001")).thenReturn(Optional.empty());
         when(batchMapper.toEntity(requestDTO, product)).thenReturn(batch);
         when(batchRepository.save(batch)).thenReturn(batch);
@@ -146,7 +146,7 @@ class BatchServiceTests {
         Product product = existingProduct();
         Batch batch = existingBatch();
 
-        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(product));
         when(batchRepository.findByBatchCodeIgnoreCase("LOT-001")).thenReturn(Optional.empty());
         when(batchMapper.toEntity(requestDTO, product)).thenReturn(batch);
 

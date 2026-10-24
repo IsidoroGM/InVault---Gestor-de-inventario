@@ -10,6 +10,12 @@ export function catalogErrorMessage(error: unknown, fallback: string): string {
   if (error.status === 403) {
     return 'Tu rol no permite modificar catálogos.';
   }
+  if (
+    error.message ===
+    'A unit already used by a product cannot change its code, name or symbol. Create a new unit.'
+  ) {
+    return 'La unidad ya se utiliza en productos y debe conservar su código, nombre y símbolo. Crea una unidad nueva para otra medida.';
+  }
   return error.message || fallback;
 }
 
