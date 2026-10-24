@@ -82,6 +82,13 @@ The host must accept inbound TCP traffic on ports 80 and 443 and UDP traffic on 
 - A newly deployed frontend is downloaded in the background. InVault displays an explicit update action and reloads only after the user accepts it.
 - Complete [`PWA_ACCEPTANCE.md`](PWA_ACCEPTANCE.md) on Windows, Android and iPad before promoting a release.
 
+## Login protection
+
+Each company's database persists account and source-IP login budgets. Defaults are
+10 and 50 attempts in five minutes; both successful and failed attempts count.
+The PWA shows the server's retry delay. See [`LOGIN_SECURITY.md`](LOGIN_SECURITY.md)
+for tuning, audit events, proxy trust and the disposable full-stack smoke test.
+
 ## Updates
 
 Back up the company database, fetch the desired release, then rebuild that same

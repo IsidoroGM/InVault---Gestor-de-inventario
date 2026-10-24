@@ -41,7 +41,7 @@ public class CorsConfig {
         ));
 
         // JWT will later be exposed through the Authorization header.
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setExposedHeaders(List.of("Authorization", "Retry-After"));
 
         // We use JWT headers, not cookies, so credentials stay disabled for now.
         configuration.setAllowCredentials(false);

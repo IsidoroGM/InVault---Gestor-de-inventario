@@ -7,4 +7,5 @@ export interface ApiErrorResponse {
   readonly path: string;
   readonly timestamp: string;
   readonly fieldErrors?: FieldErrors;
+  readonly retryAfterSeconds?: number;
 }

@@ -136,9 +136,9 @@ final class MySqlTestDatabase implements AutoCloseable {
             return DriverManager.getConnection(url(schema), username, password);
         }
 
-        ConfigurableApplicationContext start() {
+        ConfigurableApplicationContext start(String... overrides) {
             String origin = "https://" + schema.replace('_', '-') + ".example.test";
-            return new SpringApplicationBuilder(InVaultBackendApplication.class).run(
+            var arguments = new ArrayList<>(List.of(
                     "--spring.profiles.active=prod",
                     "--server.address=127.0.0.1", "--server.port=0",
                     "--spring.main.banner-mode=off", "--logging.level.root=ERROR",
@@ -152,7 +152,9 @@ final class MySqlTestDatabase implements AutoCloseable {
                     "--invault.security.jwt.secret=" + jwtSecret,
                     "--invault.security.jwt.issuer=" + origin,
                     "--invault.cors.allowed-origins=" + origin,
-                    "--invault.realtime.allowed-origins=" + origin);
+                    "--invault.realtime.allowed-origins=" + origin));
+            arguments.addAll(List.of(overrides));
+            return new SpringApplicationBuilder(InVaultBackendApplication.class).run(arguments.toArray(String[]::new));
         }
     }
 }

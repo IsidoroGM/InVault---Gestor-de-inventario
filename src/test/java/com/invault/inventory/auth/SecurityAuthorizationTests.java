@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 import java.time.Instant;
 import java.util.List;
@@ -114,6 +115,21 @@ class SecurityAuthorizationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.roles[0]").value("ADMIN"));
+    }
+
+    @Test
+    void throttledLoginReturnsRetryDelayWithoutRevealingAccountState() throws Exception {
+        when(authService.login(any(LoginRequestDTO.class), anyString())).thenThrow(new LoginRateLimitException(42));
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .header("Origin", "http://localhost:4200")
+                        .content("{\"username\":\"unknown\",\"password\":\"secret-password\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "42"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Access-Control-Expose-Headers", "Authorization, Retry-After"))
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.retryAfterSeconds").value(42))
+                .andExpect(jsonPath("$.message").value("Too many login attempts. Please wait before trying again."));
     }
 
     @Test

@@ -7,6 +7,7 @@ export type AuditAction =
   | 'STOCK_MOVEMENT_CREATED'
   | 'LOGIN_SUCCESS'
   | 'LOGIN_FAILED'
+  | 'LOGIN_THROTTLED'
   | 'LOGOUT'
   | 'PASSWORD_CHANGED'
   | 'PASSWORD_RESET';
@@ -44,6 +45,7 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   STOCK_MOVEMENT_CREATED: 'Movimiento de stock',
   LOGIN_SUCCESS: 'Acceso correcto',
   LOGIN_FAILED: 'Acceso fallido',
+  LOGIN_THROTTLED: 'Acceso limitado temporalmente',
   LOGOUT: 'Cierre de sesión',
   PASSWORD_CHANGED: 'Cambio de contraseña',
   PASSWORD_RESET: 'Restablecimiento de contraseña',

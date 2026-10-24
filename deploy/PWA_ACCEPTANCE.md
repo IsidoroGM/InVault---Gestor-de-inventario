@@ -52,6 +52,14 @@ Test tablet layouts in portrait and landscape. Record the device, OS version, br
 - [ ] `WAREHOUSE` can operate stock without accessing user administration.
 - [ ] `READ_ONLY` cannot see or execute mutation actions.
 
+## Login protection
+
+- [ ] Repeated invalid login attempts eventually show a temporary wait and remaining seconds.
+- [ ] The login button stays disabled during the displayed wait; reaching zero does not send credentials.
+- [ ] Reloading or opening another tab does not bypass the server's wait.
+- [ ] After the window expires, correct credentials can be submitted normally.
+- [ ] Management can filter audit history by **Acceso limitado temporalmente**.
+
 ## Connectivity and updates
 
 - [ ] Disconnecting the device shows the global offline warning.

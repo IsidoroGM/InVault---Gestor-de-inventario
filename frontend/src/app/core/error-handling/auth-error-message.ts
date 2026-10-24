@@ -11,6 +11,9 @@ export function authErrorMessage(error: unknown, fallback: string): string {
   if (error.status === 401) {
     return 'El usuario o la contraseña no son correctos.';
   }
+  if (error.status === 429) {
+    return 'Se han realizado demasiados intentos de acceso. Espera antes de volver a intentarlo.';
+  }
   return error.message || fallback;
 }
 

@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -23,6 +24,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import com.invault.inventory.auth.LoginRateLimitException;
 
 /**
  * Centralized exception handler for the whole REST API.
@@ -32,6 +34,16 @@ import jakarta.validation.ConstraintViolationException;
 public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(LoginRateLimitException.class)
+    public ResponseEntity<ApiRateLimitErrorResponse> handleLoginRateLimit(
+            LoginRateLimitException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.getRetryAfterSeconds()))
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(new ApiRateLimitErrorResponse(429, "Too Many Requests", exception.getMessage(),
+                        request.getRequestURI(), LocalDateTime.now(), exception.getRetryAfterSeconds()));
+    }
 
     /**
      * Returns a generic authentication error without identifying which credential failed.

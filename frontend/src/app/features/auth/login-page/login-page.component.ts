@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -9,6 +9,7 @@ import { finalize } from 'rxjs';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { authErrorMessage } from '../../../core/error-handling/auth-error-message';
+import { ApiErrorResponse } from '../../../shared/models/api-error.model';
 
 @Component({
   selector: 'app-login-page',
@@ -28,9 +29,12 @@ export class LoginPageComponent {
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private retryTimer: ReturnType<typeof setInterval> | undefined;
 
   protected readonly submitting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
+  protected readonly retryAfterSeconds = signal(0);
   protected readonly sessionMessage = this.route.snapshot.queryParamMap.has('sessionExpired')
     ? 'Tu sesión ha caducado. Vuelve a identificarte.'
     : this.route.snapshot.queryParamMap.has('passwordChanged')
@@ -42,8 +46,12 @@ export class LoginPageComponent {
     password: ['', [Validators.required, Validators.maxLength(200)]],
   });
 
+  constructor() {
+    this.destroyRef.onDestroy(() => clearInterval(this.retryTimer));
+  }
+
   protected submit(): void {
-    if (this.form.invalid || this.submitting()) {
+    if (this.form.invalid || this.submitting() || this.retryAfterSeconds() > 0) {
       this.form.markAllAsTouched();
       return;
     }
@@ -60,9 +68,40 @@ export class LoginPageComponent {
             : this.safeReturnUrl();
           void this.router.navigateByUrl(destination, { replaceUrl: true });
         },
-        error: (error: unknown) =>
-          this.errorMessage.set(authErrorMessage(error, 'No se pudo iniciar sesión.')),
+        error: (error: unknown) => {
+          this.errorMessage.set(authErrorMessage(error, 'No se pudo iniciar sesión.'));
+          if (this.isRateLimit(error)) {
+            this.waitBeforeRetry(error.retryAfterSeconds);
+          }
+        },
       });
+  }
+
+  private isRateLimit(error: unknown): error is ApiErrorResponse & { retryAfterSeconds: number } {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'status' in error &&
+      error.status === 429 &&
+      'retryAfterSeconds' in error &&
+      typeof error.retryAfterSeconds === 'number' &&
+      Number.isFinite(error.retryAfterSeconds) &&
+      error.retryAfterSeconds > 0 &&
+      error.retryAfterSeconds <= 3600
+    );
+  }
+
+  private waitBeforeRetry(seconds: number): void {
+    clearInterval(this.retryTimer);
+    const availableAt = Date.now() + Math.ceil(seconds) * 1000;
+    this.retryAfterSeconds.set(Math.ceil(seconds));
+    this.retryTimer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((availableAt - Date.now()) / 1000));
+      this.retryAfterSeconds.set(remaining);
+      if (remaining === 0) {
+        clearInterval(this.retryTimer);
+      }
+    }, 1000);
   }
 
   private safeReturnUrl(): string {

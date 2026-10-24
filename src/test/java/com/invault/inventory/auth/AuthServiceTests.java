@@ -8,6 +8,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.time.Instant;
 import java.util.List;
@@ -52,8 +55,29 @@ class AuthServiceTests {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private LoginRateLimitService loginRateLimit;
+
     @InjectMocks
     private AuthService authService;
+
+    @Test
+    void throttledAttemptNeverChecksPasswordOrIssuesToken() {
+        doThrow(new LoginRateLimitException(30)).when(loginRateLimit).check("operator", "10.0.0.8");
+        assertThrows(LoginRateLimitException.class, () -> authService.login(
+                new LoginRequestDTO(" operator ", "not-logged"), "10.0.0.8"));
+        verifyNoInteractions(authenticationManager, jwtService, userRepository, auditService);
+    }
+
+    @Test
+    void rateLimitReservationPrecedesFailedAuthentication() {
+        when(authenticationManager.authenticate(any(Authentication.class))).thenThrow(new BadCredentialsException("bad"));
+        assertThrows(UnauthorizedException.class, () -> authService.login(
+                new LoginRequestDTO("operator", "not-logged"), "10.0.0.8"));
+        var order = inOrder(loginRateLimit, authenticationManager);
+        order.verify(loginRateLimit).check("operator", "10.0.0.8");
+        order.verify(authenticationManager).authenticate(any(Authentication.class));
+    }
 
     @Test
     void successfulLoginUpdatesUserAuditsAndReturnsBearerToken() {

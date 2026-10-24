@@ -154,7 +154,7 @@ Additional safeguards prevent users from deactivating themselves or removing/dea
 │   ├── audit, realtime, config, common
 │   └── InVaultBackendApplication.java
 ├── src/main/resources
-│   ├── db/migration                 # Flyway V1-V4
+│   ├── db/migration                 # Flyway V1-V5
 │   ├── application.yml
 │   ├── application-dev.example.yml
 │   └── application-prod.yml
@@ -328,10 +328,17 @@ Production uses Flyway as the schema authority and Hibernate in validation mode:
 | `V2__add_audit_snapshots.sql`     | Adds before/after snapshots to audit records.                                                                    |
 | `V3__add_user_token_version.sql`  | Adds the token version used for immediate JWT revocation.                                                        |
 | `V4__add_stock_movement_requests.sql` | Stores movement request fingerprints and committed responses for safe retries. |
+| `V5__add_login_rate_limits.sql` | Persists per-account/source login budgets across restarts and backend instances. |
 
-The business schema contains `roles`, `users`, `user_roles`, `units`, `categories`, `locations`, `suppliers`, `products`, `batches`, `stock_movements`, `audit_logs`, and `stock_movement_requests`, plus Flyway's technical history table.
+The application schema contains `roles`, `users`, `user_roles`, `units`, `categories`, `locations`, `suppliers`, `products`, `batches`, `stock_movements`, `audit_logs`, `stock_movement_requests`, and `login_rate_limits`, plus Flyway's technical history table.
 
 The default development profile keeps Flyway disabled and uses the ignored local configuration with `ddl-auto: update`. This is a development convenience only. Production enables Flyway and uses `ddl-auto: validate`.
+
+Login requests have persistent per-account/source budgets (10/50 attempts in five
+minutes by default). A rejected request returns HTTP 429 with `Retry-After`; the
+PWA displays a countdown and requires an explicit retry. Successful logins also
+consume the budget. See [login security](deploy/LOGIN_SECURITY.md) for configuration,
+audit, proxy trust and production-chain verification.
 
 ## Production deployment
 

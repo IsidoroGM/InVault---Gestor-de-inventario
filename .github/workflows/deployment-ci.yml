@@ -86,3 +86,7 @@ jobs:
 
       - name: Build production images
         run: docker compose --env-file .env.production.example --file compose.prod.yml build backend frontend
+
+      - name: Verify login limits through the production proxy chain
+        shell: pwsh
+        run: ./deploy/tests/login-security.ps1
