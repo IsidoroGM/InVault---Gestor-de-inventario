@@ -55,7 +55,9 @@ export class MovementService {
     );
   }
 
-  create(request: StockMovementRequest): Observable<StockMovement> {
-    return this.api.post<StockMovementRequest, StockMovement>('/api/stock/movements', request);
+  create(request: StockMovementRequest, requestKey: string): Observable<StockMovement> {
+    return this.api.post<StockMovementRequest, StockMovement>('/api/stock/movements', request, {
+      'Idempotency-Key': requestKey,
+    });
   }
 }

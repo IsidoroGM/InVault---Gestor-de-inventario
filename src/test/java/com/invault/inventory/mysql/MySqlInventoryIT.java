@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -49,6 +50,7 @@ import com.invault.inventory.roles.RoleName;
 import com.invault.inventory.roles.RoleRepository;
 import com.invault.inventory.stock.MovementType;
 import com.invault.inventory.stock.StockService;
+import com.invault.inventory.stock.StockMovementCommandService;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.units.Unit;
 import com.invault.inventory.units.UnitRepository;
@@ -77,9 +79,9 @@ class MySqlInventoryIT {
         var company = database.createCompany("fresh");
         try (var app = company.start()) {
             JdbcTemplate jdbc = company.jdbc();
-            assertEquals(3, jdbc.queryForObject(
+            assertEquals(4, jdbc.queryForObject(
                     "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1", Integer.class));
-            assertEquals(11, jdbc.queryForObject("""
+            assertEquals(12, jdbc.queryForObject("""
                     SELECT COUNT(*) FROM information_schema.tables
                     WHERE table_schema = ? AND table_name <> 'flyway_schema_history' AND engine = 'InnoDB'
                     """, Integer.class, company.schema));
@@ -103,7 +105,7 @@ class MySqlInventoryIT {
                 VALUES ('legacy', 'legacy@example.test', 'legacy-hash', TRUE, FALSE, CURRENT_TIMESTAMP(6))
                 """);
         Flyway current = Flyway.configure().dataSource(jdbc.getDataSource()).load();
-        assertEquals(2, current.migrate().migrationsExecuted);
+        assertEquals(3, current.migrate().migrationsExecuted);
         assertEquals("legacy-hash", jdbc.queryForObject(
                 "SELECT password_hash FROM users WHERE username = 'legacy'", String.class));
         assertEquals(0L, jdbc.queryForObject("SELECT token_version FROM users WHERE username = 'legacy'", Long.class));
@@ -272,6 +274,156 @@ class MySqlInventoryIT {
             SQLException denied = assertThrows(SQLException.class,
                     () -> statement.executeQuery("SELECT COUNT(*) FROM `" + otherSchema + "`.users"));
             assertEquals(1142, denied.getErrorCode(), "SELECT on the other company must be denied by MySQL grants.");
+        }
+    }
+
+    @Test
+    void simultaneousRetriesCommitOneMovementAuditAndNotification() throws Exception {
+        var company = database.createCompany("duplicates");
+        try (var app = company.start()) {
+            Fixture stock = seed(app);
+            JdbcTemplate jdbc = company.jdbc();
+            long audits = count(jdbc, "audit_logs");
+            String key = UUID.randomUUID().toString();
+            var command = app.getBean(StockMovementCommandService.class);
+            var transaction = new TransactionTemplate(app.getBean(PlatformTransactionManager.class));
+            CountDownLatch written = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            AtomicLong retryConnection = new AtomicLong();
+            AtomicInteger notifications = new AtomicInteger();
+            SubscribableChannel broker = app.getBean("brokerChannel", SubscribableChannel.class);
+            MessageHandler observer = message -> {
+                if ("/topic/inventory".equals(SimpMessageHeaderAccessor.getDestination(message.getHeaders()))) {
+                    notifications.incrementAndGet();
+                }
+            };
+            broker.subscribe(observer);
+            var pool = Executors.newFixedThreadPool(2);
+            try {
+                var original = pool.submit(() -> asUser(stock.user(), () -> transaction.execute(status -> {
+                    var response = command.execute(request(stock, MovementType.OUTBOUND, "7.001"), stock.user().getId(), key);
+                    written.countDown();
+                    await(release);
+                    return response;
+                })));
+                assertTrue(written.await(15, TimeUnit.SECONDS));
+                assertEquals(0, notifications.get(), "No notification may escape before commit.");
+                var retry = pool.submit(() -> asUser(stock.user(), () -> transaction.execute(status -> {
+                    retryConnection.set(app.getBean(JdbcTemplate.class).queryForObject("SELECT CONNECTION_ID()", Long.class));
+                    return command.execute(request(stock, MovementType.OUTBOUND, "7.001"), stock.user().getId(), key);
+                })));
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                boolean waiting = false;
+                while (System.nanoTime() < deadline) {
+                    waiting = retryConnection.get() != 0 && database.admin().queryForObject("""
+                            SELECT COUNT(*) FROM information_schema.innodb_trx
+                            WHERE trx_mysql_thread_id = ? AND trx_state = 'LOCK WAIT'
+                            """, Integer.class, retryConnection.get()) == 1;
+                    if (waiting) break;
+                    Thread.sleep(50);
+                }
+                assertTrue(waiting, "Duplicate request must wait for the original transaction's reservation.");
+                release.countDown();
+                var first = original.get(20, TimeUnit.SECONDS);
+                var second = retry.get(20, TimeUnit.SECONDS);
+                assertEquals(first.getId(), second.getId());
+                assertEquals(first.getMovementDate(), second.getMovementDate());
+                assertEquals(new BigDecimal("3.124"), quantity(jdbc, stock.batchId()));
+                assertEquals(2, count(jdbc, "stock_movements"));
+                assertEquals(audits + 1, count(jdbc, "audit_logs"));
+                assertEquals(1, count(jdbc, "stock_movement_requests"));
+                assertEquals(1, notifications.get());
+            } finally {
+                release.countDown();
+                pool.shutdownNow();
+                assertTrue(pool.awaitTermination(25, TimeUnit.SECONDS));
+                broker.unsubscribe(observer);
+            }
+        }
+    }
+
+    @Test
+    void responseSurvivesRestartAndDifferentPayloadIsAnHttpConflict() throws Exception {
+        var company = database.createCompany("request");
+        String key = UUID.randomUUID().toString();
+        Fixture stock;
+        com.invault.inventory.stock.dto.StockMovementResponseDTO original;
+        try (var app = company.start()) {
+            stock = seed(app);
+            var command = app.getBean(StockMovementCommandService.class);
+            assertThrows(BadRequestException.class, () -> asUser(stock.user(), () ->
+                    command.execute(request(stock, MovementType.OUTBOUND, "1.000"), stock.user().getId(), "not-a-uuid")));
+            original = asUser(stock.user(), () -> command.execute(
+                    request(stock, MovementType.OUTBOUND, "1.000"), stock.user().getId(), key));
+            String token = "Bearer " + app.getBean(JwtService.class).generateToken(stock.user()).token();
+            api(app).perform(post("/api/stock/movements").header("Authorization", token).header("Idempotency-Key", key)
+                            .contentType("application/json").content("""
+                                    {"productId":%d,"batchId":%d,"movementType":"OUTBOUND",
+                                     "quantity":1.000,"reason":"MySQL integration test"}
+                                    """.formatted(stock.productId(), stock.batchId())))
+                    .andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(original.getId()))
+                    .andExpect(jsonPath("$.newBatchQuantity").value(9.125));
+            api(app).perform(post("/api/stock/movements").header("Authorization", token).header("Idempotency-Key", key)
+                            .contentType("application/json").content("""
+                                    {"productId":%d,"batchId":%d,"movementType":"OUTBOUND",
+                                     "quantity":2.000,"reason":"MySQL integration test"}
+                                    """.formatted(stock.productId(), stock.batchId())))
+                    .andExpect(status().isConflict());
+            company.jdbc().update("UPDATE products SET name = 'Renamed after original response' WHERE id = ?", stock.productId());
+        }
+        try (var restarted = company.start()) {
+            var replay = asUser(stock.user(), () -> restarted.getBean(StockMovementCommandService.class).execute(
+                    request(stock, MovementType.OUTBOUND, "1.0"), stock.user().getId(), key.toUpperCase()));
+            assertEquals(original.getId(), replay.getId());
+            assertEquals(original.getProductName(), replay.getProductName(), "Replay must preserve the original response snapshot.");
+            assertEquals(original.getMovementDate(), replay.getMovementDate());
+            assertEquals(new BigDecimal("9.125"), quantity(company.jdbc(), stock.batchId()));
+            assertEquals(2, count(company.jdbc(), "stock_movements"));
+            assertEquals(1, count(company.jdbc(), "stock_movement_requests"));
+        }
+    }
+
+    @Test
+    void failedAuditRollsBackTheRequestReservationSoTheSameKeyCanRetry() {
+        var company = database.createCompany("keyretry");
+        try (var app = company.start()) {
+            Fixture stock = seed(app);
+            String key = UUID.randomUUID().toString();
+            var command = app.getBean(StockMovementCommandService.class);
+            database.admin().execute("CREATE TRIGGER `" + company.schema + "`.reject_audit BEFORE INSERT ON `"
+                    + company.schema + "`.audit_logs FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'request audit rejected'");
+            try {
+                assertThrows(RuntimeException.class, () -> asUser(stock.user(), () -> command.execute(
+                        request(stock, MovementType.OUTBOUND, "1.001"), stock.user().getId(), key)));
+                assertEquals(0, count(company.jdbc(), "stock_movement_requests"));
+                assertEquals(1, count(company.jdbc(), "stock_movements"));
+                assertEquals(new BigDecimal("10.125"), quantity(company.jdbc(), stock.batchId()));
+            } finally {
+                database.admin().execute("DROP TRIGGER `" + company.schema + "`.reject_audit");
+            }
+            asUser(stock.user(), () -> command.execute(request(stock, MovementType.OUTBOUND, "1.001"), stock.user().getId(), key));
+            assertEquals(1, count(company.jdbc(), "stock_movement_requests"));
+            assertEquals(2, count(company.jdbc(), "stock_movements"));
+            assertEquals(3, count(company.jdbc(), "audit_logs"));
+        }
+    }
+
+    @Test
+    void identicalKeysBelongToTheirAuthenticatedUsers() {
+        var company = database.createCompany("actors");
+        try (var app = company.start()) {
+            Fixture stock = seed(app);
+            User second = admin(app, "admin-b");
+            String key = UUID.randomUUID().toString();
+            var commands = app.getBean(StockMovementCommandService.class);
+            var first = asUser(stock.user(), () -> commands.execute(
+                    request(stock, MovementType.OUTBOUND, "1.000"), stock.user().getId(), key));
+            var other = asUser(second, () -> commands.execute(
+                    request(stock, MovementType.OUTBOUND, "1.000"), second.getId(), key));
+            assertNotEquals(first.getId(), other.getId());
+            assertEquals(second.getId(), other.getUserId());
+            assertEquals(2, count(company.jdbc(), "stock_movement_requests"));
+            assertEquals(new BigDecimal("8.125"), quantity(company.jdbc(), stock.batchId()));
         }
     }
 

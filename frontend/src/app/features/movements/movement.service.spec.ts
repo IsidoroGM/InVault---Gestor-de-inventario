@@ -58,7 +58,9 @@ describe('MovementService', () => {
       quantity: 4,
       reason: 'Recepción',
     };
-    service().create(request).subscribe();
-    expect(api.post).toHaveBeenCalledWith('/api/stock/movements', request);
+    service().create(request, 'request-key').subscribe();
+    expect(api.post).toHaveBeenCalledWith('/api/stock/movements', request, {
+      'Idempotency-Key': 'request-key',
+    });
   });
 });

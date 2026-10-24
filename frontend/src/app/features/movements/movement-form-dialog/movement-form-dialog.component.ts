@@ -21,6 +21,8 @@ import {
   movementDirection,
 } from '../movement.models';
 import { MovementService } from '../movement.service';
+import { MovementSubmission, MovementSubmissionStore } from '../movement-submission.store';
+import { NetworkStatusService } from '../../../core/pwa/network-status.service';
 
 @Component({
   selector: 'app-movement-form-dialog',
@@ -41,6 +43,10 @@ export class MovementFormDialogComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialogRef = inject(MatDialogRef<MovementFormDialogComponent, StockMovement>);
   private readonly service = inject(MovementService);
+  private readonly submissions = inject(MovementSubmissionStore);
+  private readonly network = inject(NetworkStatusService);
+  private storageBlocked = false;
+  protected readonly pendingSubmission = signal<MovementSubmission | null>(null);
   protected readonly data = inject<MovementFormOptions>(MAT_DIALOG_DATA);
   protected readonly batches = signal<readonly MovementBatchOption[]>([]);
   protected readonly loadingBatches = signal(false);
@@ -85,6 +91,21 @@ export class MovementFormDialogComponent {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((batches) => this.batches.set(batches));
+
+    try {
+      const pending = this.submissions.current();
+      if (pending) {
+        this.form.patchValue({ ...pending.request, reason: pending.request.reason ?? '' });
+        this.form.disable({ emitEvent: false });
+        this.pendingSubmission.set(pending);
+      }
+    } catch (error) {
+      this.storageBlocked = true;
+      this.form.disable({ emitEvent: false });
+      this.errorMessage.set(
+        error instanceof Error ? error.message : 'No se puede recuperar el envío pendiente.',
+      );
+    }
   }
 
   protected selectedBatch(): MovementBatchOption | null {
@@ -103,7 +124,12 @@ export class MovementFormDialogComponent {
   }
 
   protected submit(): void {
-    if (this.form.invalid || this.submitting()) {
+    if (this.submitting() || this.storageBlocked) return;
+    if (!this.network.online()) {
+      this.errorMessage.set('Conéctate a Internet para registrar o confirmar el movimiento.');
+      return;
+    }
+    if (!this.pendingSubmission() && this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
@@ -116,14 +142,38 @@ export class MovementFormDialogComponent {
       quantity: value.quantity as number,
       reason: value.reason.trim() || null,
     };
+    let submission = this.pendingSubmission();
+    try {
+      submission ??= this.submissions.begin(request);
+    } catch (error) {
+      this.errorMessage.set(
+        error instanceof Error ? error.message : 'No se pudo preparar el envío.',
+      );
+      return;
+    }
+    const command = submission;
+    this.pendingSubmission.set(command);
+    this.form.disable({ emitEvent: false });
     this.submitting.set(true);
     this.errorMessage.set(null);
     this.service
-      .create(request)
+      .create(command.request, command.key)
       .pipe(finalize(() => this.submitting.set(false)))
       .subscribe({
-        next: (movement) => this.dialogRef.close(movement),
+        next: (movement) => {
+          this.submissions.complete(command);
+          this.dialogRef.close(movement);
+        },
         error: (error: unknown) => {
+          // These responses confirm that validation/business lookup failed before commit.
+          // Authentication failures and uncertain outcomes retain the frozen original command.
+          const status =
+            typeof error === 'object' && error !== null && 'status' in error ? error.status : null;
+          if (status === 400 || status === 404 || status === 422) {
+            this.submissions.complete(command);
+            this.pendingSubmission.set(null);
+            this.form.enable({ emitEvent: false });
+          }
           this.applyFieldErrors(apiFieldErrors(error));
           this.errorMessage.set(
             apiErrorMessage(

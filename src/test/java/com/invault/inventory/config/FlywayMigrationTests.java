@@ -30,12 +30,12 @@ class FlywayMigrationTests {
                 WHERE table_schema = 'public'
                   AND table_name IN ('roles', 'users', 'user_roles', 'categories', 'locations',
                                      'units', 'suppliers', 'products', 'batches',
-                                     'stock_movements', 'audit_logs')
+                                     'stock_movements', 'audit_logs', 'stock_movement_requests')
                 """,
                 Integer.class
         );
 
-        assertEquals(11, businessTables);
+        assertEquals(12, businessTables);
 
         Integer auditSnapshotColumns = jdbcTemplate.queryForObject(
                 """

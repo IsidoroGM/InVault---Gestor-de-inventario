@@ -38,6 +38,9 @@ Test tablet layouts in portrait and landscape. Record the device, OS version, br
 - [ ] A product with more than 100 batches can use a batch beyond the first 100 in a movement.
 - [ ] Register an inbound stock movement and verify batch, stock and dashboard values.
 - [ ] Register an outbound movement and verify the same values again.
+- [ ] Double-tapping movement submission records one movement and one audit entry.
+- [ ] Lose the movement response after submission, reopen/reload the same tab, and explicitly retry; the same movement ID is returned and stock changes once.
+- [ ] An unconfirmed movement keeps its original fields fixed; reconnecting never sends it automatically.
 - [ ] A second signed-in device receives the stock update without a manual reload.
 - [ ] Blocking or unblocking a batch refreshes availability and dashboard values on the other device.
 - [ ] Audit records identify the actor and the before/after values.

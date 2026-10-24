@@ -125,6 +125,13 @@ La barra global informa cuando el dispositivo pierde conexión, ofrece la instal
 
 El caché PWA se limita al shell, bundles, fuentes e imágenes. `/api/**` y `/ws/**` se excluyen de navegación y no existen `dataGroups` para respuestas del backend. Un interceptor rechaza cualquier método HTTP distinto de lectura cuando `navigator.onLine` indica que el dispositivo está offline.
 
+Los movimientos enviados conservan una clave y su petición original en sessionStorage
+por usuario mientras no se confirme el resultado. El formulario bloquea el doble
+envío y permite reintentar la misma operación después de perder la respuesta o
+recargar esa pestaña. No prepara movimientos nuevos sin conexión ni los reenvía
+automáticamente al recuperarla. El servidor exige `Idempotency-Key` y devuelve el
+movimiento original; véase [el contrato y sus límites](../deploy/MOVEMENT_IDEMPOTENCY.md).
+
 - Sin QR ni códigos de barras.
 - Sin recuperación autónoma de contraseña; la gestiona un administrador.
 - Sin edición directa de cantidades de lote; el stock cambia exclusivamente mediante movimientos.

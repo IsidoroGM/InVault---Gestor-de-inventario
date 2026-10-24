@@ -40,6 +40,7 @@ import com.invault.inventory.categories.dto.CategoryRequestDTO;
 import com.invault.inventory.categories.dto.CategoryResponseDTO;
 import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.stock.StockService;
+import com.invault.inventory.stock.StockMovementCommandService;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.units.UnitService;
@@ -67,6 +68,9 @@ class SecurityAuthorizationTests {
 
     @MockitoBean
     private StockService stockService;
+
+    @MockitoBean
+    private StockMovementCommandService movementCommands;
 
     @MockitoBean
     private UserService userService;
@@ -180,11 +184,12 @@ class SecurityAuthorizationTests {
                         .content(requestBody))
                 .andExpect(status().isForbidden());
 
-        when(stockService.createMovement(any(StockMovementRequestDTO.class), any(Long.class)))
+        when(movementCommands.execute(any(StockMovementRequestDTO.class), any(Long.class), any(String.class)))
                 .thenReturn(new StockMovementResponseDTO());
 
         mockMvc.perform(post("/api/stock/movements")
                         .header("Authorization", bearerToken("WAREHOUSE"))
+                        .header("Idempotency-Key", "2b4e8f96-9d25-49da-a4f3-d6fe532c947e")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isCreated());
@@ -201,14 +206,17 @@ class SecurityAuthorizationTests {
 
     @Test
     void corsAllowsConfiguredFrontendAndRejectsOtherOrigins() throws Exception {
-        mockMvc.perform(options("/api/products")
+        mockMvc.perform(options("/api/stock/movements")
                         .header("Origin", "http://localhost:4200")
-                        .header("Access-Control-Request-Method", "GET"))
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "Authorization,Content-Type,Idempotency-Key"))
                 .andExpect(status().isOk())
                 .andExpect(result -> {
                     String origin = result.getResponse().getHeader("Access-Control-Allow-Origin");
                     org.assertj.core.api.Assertions.assertThat(origin)
                             .isEqualTo("http://localhost:4200");
+                    org.assertj.core.api.Assertions.assertThat(result.getResponse().getHeader("Access-Control-Allow-Headers"))
+                            .contains("Idempotency-Key");
                 });
 
         mockMvc.perform(options("/api/products")

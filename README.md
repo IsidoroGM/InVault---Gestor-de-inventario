@@ -34,6 +34,7 @@ This is a serious MVP rather than a finished multi-site warehouse platform. The 
 - Management of products, units, categories, locations, suppliers, and batches.
 - Logical deactivation instead of destructive deletion for master data.
 - Auditable inbound, outbound, positive-adjustment, and negative-adjustment stock movements.
+- Persistent movement request keys prevent duplicate effects when a submitted operation is retried.
 - Batch-level balances, product-level aggregated stock, minimum-stock thresholds, and low-stock indicators.
 - Dashboard indicators and recent operational activity.
 - Pessimistic locking of batches to protect stock integrity under concurrent operations.
@@ -153,7 +154,7 @@ Additional safeguards prevent users from deactivating themselves or removing/dea
 │   ├── audit, realtime, config, common
 │   └── InVaultBackendApplication.java
 ├── src/main/resources
-│   ├── db/migration                 # Flyway V1-V3
+│   ├── db/migration                 # Flyway V1-V4
 │   ├── application.yml
 │   ├── application-dev.example.yml
 │   └── application-prod.yml
@@ -307,6 +308,12 @@ Paginated responses expose `content`, `page`, `size`, `totalElements`, `totalPag
 
 API errors use a consistent JSON structure containing HTTP status, error, message, path, and timestamp. Validation failures also provide a `fieldErrors` object that the frontend maps to form controls.
 
+Stock movement creation requires a UUID `Idempotency-Key` header. Repeating the
+same key and payload as the same user returns the original HTTP 201 response;
+changing its payload returns 409. The browser retains an unconfirmed submission
+for explicit retry in the same tab session. See [movement retry protection](deploy/MOVEMENT_IDEMPOTENCY.md)
+for transaction behavior, client recovery and rollout requirements.
+
 The frontend connects to `/ws`, sends the bearer token in the STOMP `CONNECT` frame, and subscribes only to `/topic/inventory`. Clients are not permitted to publish messages through STOMP. The current backend uses an in-memory simple broker and publishes `STOCK_UPDATED` for movements and `BATCH_CHANGED` for batch creation or maintenance after a successful commit.
 
 `BATCH_CHANGED` identifies the product and batch and includes the current batch quantity; movement-specific fields are null. Clients refresh authoritative REST data for either event and after every connection or reconnection, including when no new movement arrives. In-flight inventory reads are cancelled when a newer refresh starts so late responses cannot replace newer data.
@@ -320,8 +327,9 @@ Production uses Flyway as the schema authority and Hibernate in validation mode:
 | `V1__create_inventory_schema.sql` | Creates the identity, catalogue, product, batch, stock movement, and audit tables with foreign keys and indexes. |
 | `V2__add_audit_snapshots.sql`     | Adds before/after snapshots to audit records.                                                                    |
 | `V3__add_user_token_version.sql`  | Adds the token version used for immediate JWT revocation.                                                        |
+| `V4__add_stock_movement_requests.sql` | Stores movement request fingerprints and committed responses for safe retries. |
 
-The business schema contains `roles`, `users`, `user_roles`, `units`, `categories`, `locations`, `suppliers`, `products`, `batches`, `stock_movements`, and `audit_logs`, plus Flyway's technical history table.
+The business schema contains `roles`, `users`, `user_roles`, `units`, `categories`, `locations`, `suppliers`, `products`, `batches`, `stock_movements`, `audit_logs`, and `stock_movement_requests`, plus Flyway's technical history table.
 
 The default development profile keeps Flyway disabled and uses the ignored local configuration with `ddl-auto: update`. This is a development convenience only. Production enables Flyway and uses `ddl-auto: validate`.
 

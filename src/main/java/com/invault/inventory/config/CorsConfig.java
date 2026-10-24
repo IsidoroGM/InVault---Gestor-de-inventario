@@ -36,7 +36,8 @@ public class CorsConfig {
         configuration.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
-                "Accept"
+                "Accept",
+                "Idempotency-Key"
         ));
 
         // JWT will later be exposed through the Authorization header.

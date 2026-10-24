@@ -4,6 +4,11 @@
 </header>
 
 <mat-dialog-content>
+  @if (pendingSubmission() && !submitting()) {
+    <p class="form-alert" role="status">
+      Hay un envío pendiente de confirmación. Reinténtalo para comprobar si se registró.
+    </p>
+  }
   @if (errorMessage()) {
     <p class="form-alert" role="alert">{{ errorMessage() }}</p>
   }
@@ -90,12 +95,18 @@
 
 <mat-dialog-actions align="end">
   <button mat-button type="button" [mat-dialog-close]="undefined" [disabled]="submitting()">
-    Cancelar
+    {{ pendingSubmission() ? 'Cerrar' : 'Cancelar' }}
   </button>
   <button mat-flat-button type="submit" form="movement-form" [disabled]="submitting()">
     @if (submitting()) {
       <mat-spinner diameter="18" />
     }
-    {{ submitting() ? 'Registrando…' : 'Registrar movimiento' }}
+    {{
+      submitting()
+        ? 'Registrando…'
+        : pendingSubmission()
+          ? 'Reintentar envío'
+          : 'Registrar movimiento'
+    }}
   </button>
 </mat-dialog-actions>

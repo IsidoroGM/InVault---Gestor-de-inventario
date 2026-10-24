@@ -36,6 +36,7 @@ import {
   movementDirection,
 } from './movement.models';
 import { MovementService } from './movement.service';
+import { MovementSubmissionStore } from './movement-submission.store';
 
 @Component({
   selector: 'app-movements-page',
@@ -64,6 +65,7 @@ export class MovementsPageComponent implements OnInit {
   private readonly realtime = inject(InventoryRealtimeService);
   private inventoryRequest?: Subscription;
   private readonly service = inject(MovementService);
+  private readonly submissions = inject(MovementSubmissionStore);
   private readonly snackBar = inject(MatSnackBar);
   private readonly sessionStore = inject(AuthSessionStore);
 
@@ -129,7 +131,7 @@ export class MovementsPageComponent implements OnInit {
   }
 
   protected openCreate(): void {
-    if (this.options().products.length === 0) {
+    if (this.options().products.length === 0 && !this.submissions.hasPending()) {
       this.snackBar.open('No hay productos activos disponibles.', 'Cerrar', { duration: 5000 });
       return;
     }

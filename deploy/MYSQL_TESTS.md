@@ -1,6 +1,6 @@
 # Real MySQL integration tests
 
-The `mysql-it` Maven profile adds five Failsafe tests to the ordinary backend
+The `mysql-it` Maven profile adds nine Failsafe tests to the ordinary backend
 suite. It requires a disposable MySQL **8.4 LTS** server and fails if the server or
 test credentials are missing. Regular `mvn verify` remains available without MySQL.
 
@@ -17,6 +17,9 @@ The tests exercise:
 - Two application instances with separate databases, database users, JWT keys and
   issuers: deny cross-database SQL and cross-company tokens, isolate catalogue and
   movements, then retain stock and audit history after restarting one application.
+- Duplicate movement requests: simultaneous retries have one effect, audit and
+  notification; replay retains the original response after restart, changed payloads
+  return 409, failed audit releases the key, and users have independent key scopes.
 
 Each database has a random `invault_it_` name and a separate, randomly named user
 with privileges on that database only. Cleanup drops only resources created by
