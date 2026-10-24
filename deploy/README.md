@@ -95,6 +95,13 @@ Units used by products and units assigned to products with batches are protected
 against relabelling. See [`MEASUREMENT_IDENTITY.md`](MEASUREMENT_IDENTITY.md) for
 permitted edits, permanent flags, concurrent creation and the V6 rollout.
 
+## Backup supervision
+
+Use [`check-backups.ps1`](check-backups.ps1) to report absent/stale company backups
+and optional replica hash mismatches. JSON and exit codes support host monitoring;
+an hourly systemd template is provided. See [`BACKUP_MONITORING.md`](BACKUP_MONITORING.md)
+for configuration and the distinction between freshness checks and recovery tests.
+
 ## Updates
 
 Back up the company database, fetch the desired release, then rebuild that same

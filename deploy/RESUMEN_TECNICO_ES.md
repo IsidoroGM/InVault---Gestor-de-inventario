@@ -90,6 +90,15 @@ movimientos, límites de acceso y marcas de unidades. También comprueba que una
 copia alterada, una clave incorrecta o una empresa distinta sean rechazadas.
 Guía: [BACKUPS.md](BACKUPS.md).
 
+También se ha preparado una comprobación de copias por empresa: detecta que
+falte una copia, que sea demasiado antigua, que parezca truncada o que no coincida
+con su réplica. Utiliza la fecha del nombre generado por la herramienta; copiar
+un archivo antiguo no lo convierte en una copia reciente. Devuelve un resultado
+JSON y un código de salida para la supervisión del servidor. La plantilla de
+comprobación horaria todavía debe activarse en el alojamiento elegido y conectarse
+a sus alertas. Esta comprobación no descifra ni sustituye una restauración de
+ensayo. Guía: [BACKUP_MONITORING.md](BACKUP_MONITORING.md).
+
 ## 7. Cómo se comprueba y publica cada avance
 
 Se ejecutan pruebas de Java, pruebas contra MySQL 8.4 real, pruebas de Angular,

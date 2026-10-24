@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repository = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Import-Module (Join-Path $repository 'deploy/Backup.psm1') -Force
+Import-Module (Join-Path $repository 'deploy/BackupStatus.psm1') -Force
 $extension = if ($IsWindows) { '.exe' } else { '' }
 $age = Join-Path $AgeDirectory "age$extension"
 $keygen = Join-Path $AgeDirectory "age-keygen$extension"
@@ -112,6 +113,9 @@ UPDATE products SET unit_locked = TRUE WHERE id = 1;
         Assert-Rejected { & (Join-Path $repository 'deploy/backup-company.ps1') -CompanyId 'other-company' -EnvironmentFile $config.EnvironmentFile -RecipientFile $recipient -OutputDirectory $testRoot -AgeExecutable $age }
     }
     Assert-True ($backup.Bytes -gt 100) 'Encrypted backup is unexpectedly empty.'
+    $statusArguments = @{CompanyId=$company; BackupDirectory=$testRoot}
+    if (-not $MySqlHome) { $statusArguments.ReplicaDirectory = $replica }
+    Assert-True (Get-InVaultBackupStatus @statusArguments).healthy 'A real encrypted company backup failed monitoring.'
     Assert-True ([IO.File]::ReadAllText($backup.BackupFile).StartsWith('age-encryption.org/v1')) 'Backup is not an age file.'
     $probe = @{Touched=$false}
     $forbiddenImport = { param($manifest, $sql) $probe.Touched = $true; throw 'Import must not begin.' }

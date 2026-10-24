@@ -1,0 +1,15 @@
+[Unit]
+Description=Check InVault backup freshness for company %i
+
+[Service]
+Type=oneshot
+User=invault-backup
+UMask=0077
+WorkingDirectory=/opt/invault
+ExecStart=/usr/bin/pwsh -NoProfile -NonInteractive -File /opt/invault/deploy/check-backups.ps1 -CompanyId %i -BackupDirectory /var/backups/invault/%i -MaxAgeHours 30
+TimeoutStartSec=5min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/var/backups/invault/%i

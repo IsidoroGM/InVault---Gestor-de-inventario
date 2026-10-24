@@ -134,8 +134,14 @@ Windows alternative uses a separate temporary MySQL server:
 ```
 
 The exercise preserves decimal quantities, stock movements, audit snapshots,
-users/token versions, saved movement request responses and UTF-8 data after deleting the source stock records. It
+users/token versions, saved movement responses, login counters, measurement identity
+flags and UTF-8 data after deleting the source stock records. It
 also rejects the wrong company, wrong identity, altered/truncated ciphertext and
 failed dumps without publishing partial files. This proves the restore procedure;
 off-host durability, monitoring, scheduling and recovery objectives still require
 acceptance on the chosen deployment host.
+
+For a read-only freshness check, optional replica hash verification and an hourly
+host template, see [BACKUP_MONITORING.md](BACKUP_MONITORING.md). These checks require
+no private key and complement authenticated recovery drills. No timer is activated
+until configured on the chosen host.
