@@ -1,5 +1,11 @@
 # InVault production deployment
 
+## One database per company
+
+Use an independent deployment for each company, with a unique Compose project,
+database volume, credentials, JWT key and domain. The company configuration generator,
+commands and hosting constraints are documented in [COMPANY_DEPLOYMENTS.md](COMPANY_DEPLOYMENTS.md).
+
 ## HTTPS preview without a domain
 
 For tablet and desktop acceptance testing, Windows with Docker Desktop can expose the
@@ -88,7 +94,7 @@ docker compose --env-file .env --file compose.prod.yml up --detach --build
 docker compose --env-file .env --file compose.prod.yml ps
 ```
 
-Do not use `docker compose down --volumes` in production: it deletes the MySQL volume. Store encrypted backups outside the host and periodically test restoration.
+Do not use `docker compose down --volumes` in production: it deletes the MySQL volume. Use [encrypted per-company backups and isolated recovery](BACKUPS.md), store copies outside the host and periodically test restoration.
 
 ## Operations
 

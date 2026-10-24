@@ -34,9 +34,12 @@ Test tablet layouts in portrait and landscape. Record the device, OS version, br
 
 - [ ] Create or select catalogues and create a product.
 - [ ] Create a batch and confirm that its quantity is read-only.
+- [ ] Editing an existing batch keeps its product fixed, including when its balance is zero.
+- [ ] A product with more than 100 batches can use a batch beyond the first 100 in a movement.
 - [ ] Register an inbound stock movement and verify batch, stock and dashboard values.
 - [ ] Register an outbound movement and verify the same values again.
 - [ ] A second signed-in device receives the stock update without a manual reload.
+- [ ] Blocking or unblocking a batch refreshes availability and dashboard values on the other device.
 - [ ] Audit records identify the actor and the before/after values.
 
 ## Roles
@@ -51,6 +54,8 @@ Test tablet layouts in portrait and landscape. Record the device, OS version, br
 - [ ] Disconnecting the device shows the global offline warning.
 - [ ] Every create, update, deactivate, password and stock operation is rejected offline.
 - [ ] Reconnecting removes the warning and restores the STOMP connection.
+- [ ] Disconnect one device, record a movement on another, and reconnect the first without recording another movement; its stock and history refresh automatically.
+- [ ] A lost live connection while Internet remains available shows the stale-data warning, which disappears when the live connection recovers.
 - [ ] Deploying a new frontend version shows the update notice.
 - [ ] Accepting the update reloads once and preserves database data.
 - [ ] The application shell can reopen during a short outage, without presenting cached inventory as current data.

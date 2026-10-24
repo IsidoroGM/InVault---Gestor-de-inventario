@@ -7,6 +7,7 @@ import {
   inject,
   OnInit,
   signal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
@@ -19,7 +20,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
 import { InventoryRealtimeService } from '../../core/realtime/inventory-realtime.service';
@@ -52,10 +53,10 @@ export class BatchesPageComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly formBuilder = inject(FormBuilder);
   private readonly realtime = inject(InventoryRealtimeService);
+  private inventoryRequest?: Subscription;
   private readonly service = inject(BatchService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly sessionStore = inject(AuthSessionStore);
-  private lastMovementId: number | null = null;
 
   protected readonly batches = signal<readonly Batch[]>([]);
   protected readonly products = signal<readonly BatchProductOption[]>([]);
@@ -86,17 +87,13 @@ export class BatchesPageComponent implements OnInit {
 
   constructor() {
     effect(() => {
-      const event = this.realtime.lastEvent();
-      if (event && event.movementId !== this.lastMovementId) {
-        this.lastMovementId = event.movementId;
-        this.loadBatches();
-      }
+      this.realtime.refreshVersion();
+      untracked(() => this.loadBatches());
     });
   }
 
   ngOnInit(): void {
     this.loadProducts();
-    this.loadBatches();
     this.filters.controls.productId.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
@@ -168,9 +165,10 @@ export class BatchesPageComponent implements OnInit {
   }
 
   private loadBatches(): void {
+    this.inventoryRequest?.unsubscribe();
     this.loading.set(true);
     this.errorMessage.set(null);
-    this.service
+    this.inventoryRequest = this.service
       .search({
         productId: this.filters.controls.productId.value,
         page: this.pageIndex,

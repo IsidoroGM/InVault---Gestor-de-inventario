@@ -2,7 +2,9 @@ package com.invault.inventory.batches;
 
 import java.math.BigDecimal;
 import java.util.Locale;
+import java.util.Objects;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
@@ -17,6 +19,8 @@ import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.products.Product;
 import com.invault.inventory.products.ProductRepository;
+import com.invault.inventory.realtime.BatchChangedEvent;
+import com.invault.inventory.realtime.InventoryEventDTO;
 
 @Service
 @Transactional
@@ -26,17 +30,20 @@ public class BatchService {
     private final ProductRepository productRepository;
     private final BatchMapper batchMapper;
     private final AuditService auditService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public BatchService(
             BatchRepository batchRepository,
             ProductRepository productRepository,
             BatchMapper batchMapper,
-            AuditService auditService) {
+            AuditService auditService,
+            ApplicationEventPublisher eventPublisher) {
 
         this.batchRepository = batchRepository;
         this.productRepository = productRepository;
         this.batchMapper = batchMapper;
         this.auditService = auditService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -89,20 +96,24 @@ public class BatchService {
         BatchResponseDTO response = batchMapper.toResponseDTO(savedBatch);
         auditService.registerMutation(
                 AuditAction.CREATED, "Batch", response.getId(), "Batch created.", null, response);
+        eventPublisher.publishEvent(new BatchChangedEvent(InventoryEventDTO.batchChanged(response)));
         return response;
     }
 
     public BatchResponseDTO update(Long id, BatchRequestDTO requestDTO) {
         Batch batch = findBatchEntityForUpdate(id);
+        if (!Objects.equals(batch.getProduct().getId(), requestDTO.getProductId())) {
+            throw new BadRequestException(
+                    "A batch's product cannot be changed. Create a new batch for the other product.");
+        }
         BatchResponseDTO before = batchMapper.toResponseDTO(batch);
-        Product product = findActiveProductById(requestDTO.getProductId());
+        findActiveProductById(requestDTO.getProductId());
 
         String normalizedBatchCode = normalizeBatchCode(requestDTO.getBatchCode());
 
         validateBatchCodeIsUnique(normalizedBatchCode, id);
 
         // Actualizamos los campos editables del lote.
-        batch.setProduct(product);
         batch.setBatchCode(normalizedBatchCode);
         batch.setNotes(normalizeText(requestDTO.getNotes()));
 
@@ -118,6 +129,7 @@ public class BatchService {
         BatchResponseDTO after = batchMapper.toResponseDTO(updatedBatch);
         auditService.registerMutation(
                 AuditAction.UPDATED, "Batch", after.getId(), "Batch updated.", before, after);
+        eventPublisher.publishEvent(new BatchChangedEvent(InventoryEventDTO.batchChanged(after)));
         return after;
     }
 

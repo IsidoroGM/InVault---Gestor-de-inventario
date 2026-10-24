@@ -3,15 +3,18 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
   OnInit,
   signal,
+  untracked,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 
 import { InventoryRealtimeService } from '../../core/realtime/inventory-realtime.service';
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
@@ -35,9 +38,10 @@ import { DashboardService } from './dashboard.service';
 export class DashboardPageComponent implements OnInit {
   protected readonly health = inject(BackendHealthService);
   protected readonly realtime = inject(InventoryRealtimeService);
+  private readonly destroyRef = inject(DestroyRef);
+  private inventoryRequest?: Subscription;
   private readonly service = inject(DashboardService);
   private readonly sessionStore = inject(AuthSessionStore);
-  private lastMovementId: number | null = null;
 
   protected readonly data = signal<DashboardData | null>(null);
   protected readonly loading = signal(true);
@@ -49,17 +53,13 @@ export class DashboardPageComponent implements OnInit {
 
   constructor() {
     effect(() => {
-      const event = this.realtime.lastEvent();
-      if (event && event.movementId !== this.lastMovementId) {
-        this.lastMovementId = event.movementId;
-        this.loadDashboard();
-      }
+      this.realtime.refreshVersion();
+      untracked(() => this.loadDashboard());
     });
   }
 
   ngOnInit(): void {
     this.health.check();
-    this.loadDashboard();
   }
 
   protected typeLabel(type: MovementType): string {
@@ -74,11 +74,15 @@ export class DashboardPageComponent implements OnInit {
   }
 
   private loadDashboard(): void {
+    this.inventoryRequest?.unsubscribe();
     this.loading.set(true);
     this.errorMessage.set(null);
-    this.service
+    this.inventoryRequest = this.service
       .load()
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(
+        finalize(() => this.loading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: (data) => this.data.set(data),
         error: (error: unknown) =>

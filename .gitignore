@@ -41,3 +41,9 @@ src/main/resources/application-local.yml
 .env.*
 !.env.production.example
 compose.override.yml
+
+# Encrypted backups and private age identities
+/backups/
+*.age
+*.age.part
+*.agekey

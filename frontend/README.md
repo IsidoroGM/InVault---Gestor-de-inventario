@@ -12,6 +12,13 @@ La versión seleccionada es Angular 21 LTS. Angular 22 requiere Node 24.15 o sup
 
 ## Instalación y arranque
 
+La configuración de npm fija temporalmente `undici` en `7.30.1` para
+`@angular/build`: Angular 21.2.28 mantiene una versión anterior afectada por
+[avisos de seguridad](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c).
+Se conserva Angular 21 y se verifica esta sustitución con instalación limpia,
+pruebas y compilación. Revisar la sustitución cuando Angular publique una versión
+que incorpore la corrección. CI ejecuta `npm audit --audit-level=high`.
+
 ```powershell
 cd frontend
 npm ci

@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { finalize } from 'rxjs';
+import { catchError, finalize, of, switchMap, tap } from 'rxjs';
 
 import { apiErrorMessage, apiFieldErrors } from '../../../shared/utils/api-error-message';
 import {
@@ -63,14 +63,28 @@ export class MovementFormDialogComponent {
 
   constructor() {
     this.form.controls.productId.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((productId) => {
-        this.form.controls.batchId.setValue(null);
-        this.batches.set([]);
-        if (productId !== null) {
-          this.loadBatches(productId);
-        }
-      });
+      .pipe(
+        tap(() => {
+          this.form.controls.batchId.setValue(null);
+          this.batches.set([]);
+          this.errorMessage.set(null);
+        }),
+        switchMap((productId) => {
+          this.loadingBatches.set(productId !== null);
+          if (productId === null) {
+            return of<readonly MovementBatchOption[]>([]);
+          }
+          return this.service.loadBatches(productId).pipe(
+            catchError((error: unknown) => {
+              this.errorMessage.set(apiErrorMessage(error, 'No se pudieron cargar los lotes.'));
+              return of<readonly MovementBatchOption[]>([]);
+            }),
+            finalize(() => this.loadingBatches.set(false)),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((batches) => this.batches.set(batches));
   }
 
   protected selectedBatch(): MovementBatchOption | null {
@@ -124,21 +138,6 @@ export class MovementFormDialogComponent {
 
   protected serverError(controlName: keyof typeof this.form.controls): string | null {
     return (this.form.controls[controlName].getError('server') as string | undefined) ?? null;
-  }
-
-  private loadBatches(productId: number): void {
-    this.loadingBatches.set(true);
-    this.service
-      .loadBatches(productId)
-      .pipe(
-        finalize(() => this.loadingBatches.set(false)),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: (page) => this.batches.set(page.content),
-        error: (error: unknown) =>
-          this.errorMessage.set(apiErrorMessage(error, 'No se pudieron cargar los lotes.')),
-      });
   }
 
   private applyFieldErrors(errors: Readonly<Record<string, string>>): void {

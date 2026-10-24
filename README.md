@@ -57,6 +57,7 @@ The product table does not contain an editable `currentStock` field. Current pro
 The main business rules are:
 
 - Batch quantity cannot be changed through product or batch maintenance forms.
+- A batch's product is fixed at creation; editing a batch cannot transfer stock or history to another product.
 - Every stock change must be represented by a stock movement.
 - Movement quantities are positive; the movement type determines whether stock increases or decreases.
 - Stock cannot become negative.
@@ -107,7 +108,7 @@ In local development, Angular runs on port `4200` and talks directly to Spring B
 | Database          | MySQL 8.4 LTS                                              | Relational storage for identities, catalogue data, batches, movements, and audit history.            |
 | Migrations        | Flyway                                                     | Reproducible and versioned production schema changes.                                                |
 | API documentation | Springdoc OpenAPI 3                                        | Interactive Swagger documentation during development.                                                |
-| Backend testing   | JUnit, Spring Test, H2 in MySQL mode                       | Unit, security, controller, migration, transaction, and integration-level regression tests.          |
+| Backend testing   | JUnit, Spring Test, H2 and real MySQL 8.4                  | Unit, security, controller, migration, transaction, concurrency, and company-isolation tests.          |
 | Frontend testing  | Vitest through Angular CLI                                 | Unit tests for services, guards, interceptors, PWA behavior, and feature components.                 |
 | Build             | Maven Wrapper, npm lockfile, Angular CLI                   | Reproducible backend and frontend builds.                                                            |
 | Containers        | Docker, Docker Compose                                     | Repeatable builds and orchestration of the full production stack.                                    |
@@ -262,11 +263,22 @@ Backend:
 .\mvnw.cmd --batch-mode --no-transfer-progress clean verify
 ```
 
+Backend CI also runs the `mysql-it` profile against a disposable MySQL 8.4 service.
+To run that full check locally on Windows:
+
+```powershell
+.\deploy\test-mysql.ps1 -MySqlHome 'C:\tools\mysql-8.4.13-winx64'
+```
+
+See [real MySQL verification](deploy/MYSQL_TESTS.md) for setup, Docker commands,
+test coverage, cleanup and report locations.
+
 Frontend:
 
 ```powershell
 Set-Location frontend
 npm ci
+npm audit --audit-level=high
 npm run format:check
 npm run test:ci
 npm run build
@@ -295,7 +307,9 @@ Paginated responses expose `content`, `page`, `size`, `totalElements`, `totalPag
 
 API errors use a consistent JSON structure containing HTTP status, error, message, path, and timestamp. Validation failures also provide a `fieldErrors` object that the frontend maps to form controls.
 
-The frontend connects to `/ws`, sends the bearer token in the STOMP `CONNECT` frame, and subscribes only to `/topic/inventory`. Clients are not permitted to publish messages through STOMP. The current backend uses an in-memory simple broker and publishes `STOCK_UPDATED` after a successful commit.
+The frontend connects to `/ws`, sends the bearer token in the STOMP `CONNECT` frame, and subscribes only to `/topic/inventory`. Clients are not permitted to publish messages through STOMP. The current backend uses an in-memory simple broker and publishes `STOCK_UPDATED` for movements and `BATCH_CHANGED` for batch creation or maintenance after a successful commit.
+
+`BATCH_CHANGED` identifies the product and batch and includes the current batch quantity; movement-specific fields are null. Clients refresh authoritative REST data for either event and after every connection or reconnection, including when no new movement arrives. In-flight inventory reads are cancelled when a newer refresh starts so late responses cannot replace newer data.
 
 ## Database and migrations
 
@@ -333,9 +347,13 @@ docker compose --env-file .env --file compose.prod.yml ps
 
 Keep bootstrap administration enabled only for the first deployment. Change the temporary password, disable the bootstrap flag, clear its credential values, and recreate the backend service.
 
-Do not run `docker compose down --volumes` in production: that removes the MySQL volume. Back up the database before updates and store encrypted copies away from the host.
+Do not run `docker compose down --volumes` in production: that removes the MySQL volume. Back up the database before updates and store encrypted copies away from the host. [Company backup and recovery scripts](deploy/BACKUPS.md) include encryption, an isolated restore and systemd scheduling templates.
 
 See [deploy/README.md](deploy/README.md) for the complete first-deployment, update, backup, and operations procedure.
+
+For distribution to several companies, use [independent company deployments](deploy/COMPANY_DEPLOYMENTS.md).
+Each company has its own database, persistent volume, application services, credentials, JWT key and HTTPS origin.
+The configuration generator creates a private environment file for each company without starting services.
 
 ### Required production configuration
 
@@ -408,10 +426,10 @@ The project was built incrementally. The main completed milestones are:
 
 The following items are not part of the current implementation or remain recommended hardening work:
 
-- Run automated integration tests against real MySQL, for example with Testcontainers, in addition to H2's MySQL compatibility mode.
+- Complete deployment acceptance with independent MySQL volumes, container/database restart and backup restoration; automated real-MySQL integration checks already cover migrations, concurrency, rollback, company isolation and application restart.
 - Add login rate limiting, abuse monitoring, and operational alerting.
 - Add metrics, distributed tracing, richer structured logs, and correlation IDs.
-- Add coverage thresholds, dependency scanning, and static application security testing.
+- Add coverage thresholds, backend/image dependency scanning, and static application security testing. Frontend CI already audits npm dependencies.
 - Replace the in-memory STOMP broker before horizontally scaling the backend.
 - Introduce per-device sessions if global user token revocation is too coarse for future requirements.
 - Add backup automation and periodically verified restoration procedures for production.

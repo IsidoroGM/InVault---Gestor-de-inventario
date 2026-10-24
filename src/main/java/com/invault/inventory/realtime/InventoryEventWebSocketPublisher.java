@@ -17,6 +17,11 @@ public class InventoryEventWebSocketPublisher {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void publishBatchChange(BatchChangedEvent event) {
+        messagingTemplate.convertAndSend(INVENTORY_TOPIC, event.payload());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publishStockMovement(StockMovementRecordedEvent event) {
         messagingTemplate.convertAndSend(INVENTORY_TOPIC, event.payload());
     }
