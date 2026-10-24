@@ -101,7 +101,7 @@ The complete age stream is authenticated before any SQL import. The manifest
 must match the requested company. Decryption uses an owner-only temporary
 directory (Unix mode 0700 or a Windows ACL restricted to the current user), which
 is removed afterward. This directory temporarily contains compressed plaintext;
-use an encrypted recovery disk and allow space for the uncompressed ZIP archive.
+use an encrypted recovery disk and allow space for the decrypted ZIP archive.
 Deletion is ordinary filesystem deletion, not a guarantee of secure media erasure.
 
 The restore script creates a **new MySQL 8.4.11 container with no network and no

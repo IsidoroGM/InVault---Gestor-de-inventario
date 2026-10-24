@@ -24,7 +24,9 @@ try {
             Environment=@{MYSQL_ROOT_PASSWORD=$password}}).Trim()
         if ($recovery.Container -notmatch '^[a-f0-9]{64}$') { throw 'Unexpected recovery container ID.' }
         $ready = $false
-        $probe = 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root --batch --skip-column-names --execute="SELECT 1"'
+        # The image first starts a temporary socket-only server during initialization.
+        # Wait for the final TCP server and the requested database, not that temporary server.
+        $probe = 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --protocol=TCP --host=127.0.0.1 --user=root --database="$MYSQL_DATABASE" --batch --skip-column-names --execute="SELECT 1"'
         for ($attempt = 0; $attempt -lt 90; $attempt++) {
             try {
                 $answer = Invoke-BackupCommand @{File=$DockerExecutable; Arguments=@('exec', $recovery.Container, 'sh', '-c', $probe)}
