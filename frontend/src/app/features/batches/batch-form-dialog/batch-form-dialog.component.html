@@ -16,6 +16,9 @@
             <mat-option [value]="product.id">{{ product.sku }} · {{ product.name }}</mat-option>
           }
         </mat-select>
+        @if (editing) {
+          <mat-hint>El producto queda fijado al crear el lote.</mat-hint>
+        }
         @if (serverError('productId'); as message) {
           <mat-error>{{ message }}</mat-error>
         } @else if (form.controls.productId.hasError('required')) {

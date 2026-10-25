@@ -10,9 +10,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select product from Product product where product.id = :id")
+    Optional<Product> findByIdForUpdate(@Param("id") Long id);
+
+    boolean existsByUnitId(Long unitId);
 
     // Busca un producto por SKU ignorando mayúsculas/minúsculas.
     Optional<Product> findBySkuIgnoreCase(String sku);

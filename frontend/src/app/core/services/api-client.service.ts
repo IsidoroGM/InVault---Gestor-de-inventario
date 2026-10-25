@@ -17,8 +17,12 @@ export class ApiClient {
     return this.http.get(this.url(path), { responseType: 'text' });
   }
 
-  post<Request, Response>(path: string, body: Request): Observable<Response> {
-    return this.http.post<Response>(this.url(path), body);
+  post<Request, Response>(
+    path: string,
+    body: Request,
+    headers?: Readonly<Record<string, string>>,
+  ): Observable<Response> {
+    return this.http.post<Response>(this.url(path), body, { headers });
   }
 
   put<Request, Response>(path: string, body: Request): Observable<Response> {

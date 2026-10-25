@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface BatchRepository extends JpaRepository<Batch, Long> {
+    boolean existsByProductId(Long productId);
 
     // Busca un lote por código ignorando mayúsculas/minúsculas.
     Optional<Batch> findByBatchCodeIgnoreCase(String batchCode);

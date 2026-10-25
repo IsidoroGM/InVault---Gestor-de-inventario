@@ -72,5 +72,44 @@ jobs:
       - name: Validate HTTPS preview Compose model
         run: docker compose --env-file .env.production.example --file compose.prod.yml --file compose.preview.yml config --quiet
 
-      - name: Build production images
-        run: docker compose --env-file .env.production.example --file compose.prod.yml build backend frontend
+      - name: Verify independent company deployment configurations
+        shell: pwsh
+        run: ./deploy/tests/company-isolation.ps1
+
+      - name: Verify company configuration and runtime diagnostics
+        shell: pwsh
+        run: ./deploy/tests/company-status.ps1
+
+      - name: Verify release identity rules
+        shell: pwsh
+        run: ./deploy/tests/release-identity.ps1
+
+      - name: Install verified age encryption tools
+        shell: pwsh
+        run: ./deploy/install-age.ps1 -Destination "${{ runner.temp }}/invault-age"
+
+      - name: Verify company backup monitoring
+        shell: pwsh
+        run: ./deploy/tests/backup-status.ps1
+
+      - name: Verify encrypted backup and isolated company recovery
+        shell: pwsh
+        run: ./deploy/tests/backup-recovery.ps1 -AgeDirectory "${{ runner.temp }}/invault-age/age"
+
+      - name: Build identified release images
+        id: release
+        shell: pwsh
+        run: |
+          $release = ./deploy/tests/build-release.ps1 -OutputDirectory "${{ runner.temp }}/invault-release"
+          "backend=$($release.BackendImage)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          "frontend=$($release.FrontendImage)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          "revision=$($release.Revision)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Verify login limits through the production proxy chain
+        shell: pwsh
+        run: >-
+          ./deploy/tests/login-security.ps1
+          -BackendImage '${{ steps.release.outputs.backend }}'
+          -FrontendImage '${{ steps.release.outputs.frontend }}'
+          -ExpectedRevision '${{ steps.release.outputs.revision }}'
+          -AgeDirectory '${{ runner.temp }}/invault-age/age'

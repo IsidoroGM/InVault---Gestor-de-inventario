@@ -1,6 +1,7 @@
 package com.invault.inventory.units;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +12,7 @@ import com.invault.inventory.common.exception.BadRequestException;
 import com.invault.inventory.common.exception.ResourceNotFoundException;
 import com.invault.inventory.units.dto.UnitRequestDTO;
 import com.invault.inventory.units.dto.UnitResponseDTO;
+import com.invault.inventory.products.ProductRepository;
 
 @Service
 @Transactional
@@ -19,11 +21,14 @@ public class UnitService {
     private final UnitRepository unitRepository;
     private final UnitMapper unitMapper;
     private final AuditService auditService;
+    private final ProductRepository productRepository;
 
-    public UnitService(UnitRepository unitRepository, UnitMapper unitMapper, AuditService auditService) {
+    public UnitService(UnitRepository unitRepository, UnitMapper unitMapper, AuditService auditService,
+            ProductRepository productRepository) {
         this.unitRepository = unitRepository;
         this.unitMapper = unitMapper;
         this.auditService = auditService;
+        this.productRepository = productRepository;
     }
 
     @Transactional(readOnly = true)
@@ -71,11 +76,21 @@ public class UnitService {
     }
 
     public UnitResponseDTO update(Long id, UnitRequestDTO requestDTO) {
-        Unit unit = findUnitEntityById(id);
+        Unit unit = unitRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Unit not found with id: " + id));
+        // Also protect Hibernate-managed development data created before the lock column existed.
+        if (!unit.isIdentityLocked() && productRepository.existsByUnitId(id)) {
+            unit.lockIdentity();
+        }
         UnitResponseDTO before = unitMapper.toResponseDTO(unit);
 
         String normalizedCode = normalizeText(requestDTO.getCode());
         String normalizedName = normalizeText(requestDTO.getName());
+        if (unit.isIdentityLocked() && (!Objects.equals(normalizeText(unit.getCode()), normalizedCode)
+                || !Objects.equals(normalizeText(unit.getName()), normalizedName)
+                || !Objects.equals(optionalText(unit.getSymbol()), optionalText(requestDTO.getSymbol())))) {
+            throw new BadRequestException("A unit already used by a product cannot change its code, name or symbol. Create a new unit.");
+        }
 
         validateCodeIsUnique(normalizedCode, id);
         validateNameIsUnique(normalizedName, id);
@@ -99,7 +114,8 @@ public class UnitService {
     }
 
     public void deactivate(Long id) {
-        Unit unit = findUnitEntityById(id);
+        Unit unit = unitRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Unit not found with id: " + id));
         UnitResponseDTO before = unitMapper.toResponseDTO(unit);
 
         if (Boolean.FALSE.equals(unit.getActive())) {
@@ -140,6 +156,10 @@ public class UnitService {
 
     private String normalizeText(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String optionalText(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }
 

@@ -13,6 +13,9 @@ RUN npm run build
 
 FROM nginx:1.28.3-alpine3.23
 
+ARG INVAULT_BUILD_REVISION=unversioned
+LABEL org.opencontainers.image.revision="$INVAULT_BUILD_REVISION"
+
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/dist/frontend/browser/ /usr/share/nginx/html/
 

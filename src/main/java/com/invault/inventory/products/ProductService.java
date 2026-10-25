@@ -3,6 +3,7 @@ package com.invault.inventory.products;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ import com.invault.inventory.products.dto.ProductRequestDTO;
 import com.invault.inventory.products.dto.ProductResponseDTO;
 import com.invault.inventory.units.Unit;
 import com.invault.inventory.units.UnitRepository;
+import com.invault.inventory.batches.BatchRepository;
 
 @Service
 @Transactional
@@ -34,6 +36,7 @@ public class ProductService {
     private final UnitRepository unitRepository;
     private final ProductMapper productMapper;
     private final AuditService auditService;
+    private final BatchRepository batchRepository;
 
     public ProductService(
             ProductRepository productRepository,
@@ -41,7 +44,8 @@ public class ProductService {
             LocationRepository locationRepository,
             UnitRepository unitRepository,
             ProductMapper productMapper,
-            AuditService auditService) {
+            AuditService auditService,
+            BatchRepository batchRepository) {
 
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
@@ -49,6 +53,7 @@ public class ProductService {
         this.unitRepository = unitRepository;
         this.productMapper = productMapper;
         this.auditService = auditService;
+        this.batchRepository = batchRepository;
     }
 
     @Transactional(readOnly = true)
@@ -118,7 +123,14 @@ public class ProductService {
     }
 
     public ProductResponseDTO update(Long id, ProductRequestDTO requestDTO) {
-        Product product = findProductEntityById(id);
+        Product product = productRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        if (!product.isUnitLocked() && batchRepository.existsByProductId(id)) {
+            product.lockUnit();
+        }
+        if (product.isUnitLocked() && !Objects.equals(product.getUnit().getId(), requestDTO.getUnitId())) {
+            throw new BadRequestException("A product with batches cannot change its unit of measurement. Create a new product.");
+        }
         ProductResponseDTO before = productMapper.toResponseDTO(product);
 
         String normalizedSku = normalizeSku(requestDTO.getSku());
@@ -129,7 +141,8 @@ public class ProductService {
 
         Category category = findActiveCategoryById(requestDTO.getCategoryId());
         Location location = findActiveLocationById(requestDTO.getLocationId());
-        Unit unit = findActiveUnitById(requestDTO.getUnitId());
+        Unit unit = Objects.equals(product.getUnit().getId(), requestDTO.getUnitId())
+                ? lockUnitById(requestDTO.getUnitId(), false) : findActiveUnitById(requestDTO.getUnitId());
 
         // Actualizamos los campos editables de Product.
         product.setSku(normalizedSku);
@@ -153,7 +166,8 @@ public class ProductService {
     }
 
     public void deactivate(Long id) {
-        Product product = findProductEntityById(id);
+        Product product = productRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
         ProductResponseDTO before = productMapper.toResponseDTO(product);
 
         if (Boolean.FALSE.equals(product.getActive())) {
@@ -203,16 +217,22 @@ public class ProductService {
     }
 
     private Unit findActiveUnitById(Long unitId) {
+        return lockUnitById(unitId, true);
+    }
+
+    private Unit lockUnitById(Long unitId, boolean requireActive) {
         if (unitId == null) {
             throw new BadRequestException("Unit id is required.");
         }
 
-        Unit unit = unitRepository.findById(unitId)
+        Unit unit = unitRepository.findByIdForUpdate(unitId)
                 .orElseThrow(() -> new ResourceNotFoundException("Unit not found with id: " + unitId));
 
-        if (Boolean.FALSE.equals(unit.getActive())) {
+        if (requireActive && Boolean.FALSE.equals(unit.getActive())) {
             throw new BadRequestException("Unit with id " + unitId + " is inactive.");
         }
+
+        unit.lockIdentity();
 
         return unit;
     }

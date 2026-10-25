@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { finalize } from 'rxjs';
+import { catchError, finalize, of, switchMap, tap } from 'rxjs';
 
 import { apiErrorMessage, apiFieldErrors } from '../../../shared/utils/api-error-message';
 import {
@@ -21,6 +21,8 @@ import {
   movementDirection,
 } from '../movement.models';
 import { MovementService } from '../movement.service';
+import { MovementSubmission, MovementSubmissionStore } from '../movement-submission.store';
+import { NetworkStatusService } from '../../../core/pwa/network-status.service';
 
 @Component({
   selector: 'app-movement-form-dialog',
@@ -41,6 +43,10 @@ export class MovementFormDialogComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialogRef = inject(MatDialogRef<MovementFormDialogComponent, StockMovement>);
   private readonly service = inject(MovementService);
+  private readonly submissions = inject(MovementSubmissionStore);
+  private readonly network = inject(NetworkStatusService);
+  private storageBlocked = false;
+  protected readonly pendingSubmission = signal<MovementSubmission | null>(null);
   protected readonly data = inject<MovementFormOptions>(MAT_DIALOG_DATA);
   protected readonly batches = signal<readonly MovementBatchOption[]>([]);
   protected readonly loadingBatches = signal(false);
@@ -63,14 +69,43 @@ export class MovementFormDialogComponent {
 
   constructor() {
     this.form.controls.productId.valueChanges
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((productId) => {
-        this.form.controls.batchId.setValue(null);
-        this.batches.set([]);
-        if (productId !== null) {
-          this.loadBatches(productId);
-        }
-      });
+      .pipe(
+        tap(() => {
+          this.form.controls.batchId.setValue(null);
+          this.batches.set([]);
+          this.errorMessage.set(null);
+        }),
+        switchMap((productId) => {
+          this.loadingBatches.set(productId !== null);
+          if (productId === null) {
+            return of<readonly MovementBatchOption[]>([]);
+          }
+          return this.service.loadBatches(productId).pipe(
+            catchError((error: unknown) => {
+              this.errorMessage.set(apiErrorMessage(error, 'No se pudieron cargar los lotes.'));
+              return of<readonly MovementBatchOption[]>([]);
+            }),
+            finalize(() => this.loadingBatches.set(false)),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((batches) => this.batches.set(batches));
+
+    try {
+      const pending = this.submissions.current();
+      if (pending) {
+        this.form.patchValue({ ...pending.request, reason: pending.request.reason ?? '' });
+        this.form.disable({ emitEvent: false });
+        this.pendingSubmission.set(pending);
+      }
+    } catch (error) {
+      this.storageBlocked = true;
+      this.form.disable({ emitEvent: false });
+      this.errorMessage.set(
+        error instanceof Error ? error.message : 'No se puede recuperar el envío pendiente.',
+      );
+    }
   }
 
   protected selectedBatch(): MovementBatchOption | null {
@@ -89,7 +124,12 @@ export class MovementFormDialogComponent {
   }
 
   protected submit(): void {
-    if (this.form.invalid || this.submitting()) {
+    if (this.submitting() || this.storageBlocked) return;
+    if (!this.network.online()) {
+      this.errorMessage.set('Conéctate a Internet para registrar o confirmar el movimiento.');
+      return;
+    }
+    if (!this.pendingSubmission() && this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
@@ -102,14 +142,38 @@ export class MovementFormDialogComponent {
       quantity: value.quantity as number,
       reason: value.reason.trim() || null,
     };
+    let submission = this.pendingSubmission();
+    try {
+      submission ??= this.submissions.begin(request);
+    } catch (error) {
+      this.errorMessage.set(
+        error instanceof Error ? error.message : 'No se pudo preparar el envío.',
+      );
+      return;
+    }
+    const command = submission;
+    this.pendingSubmission.set(command);
+    this.form.disable({ emitEvent: false });
     this.submitting.set(true);
     this.errorMessage.set(null);
     this.service
-      .create(request)
+      .create(command.request, command.key)
       .pipe(finalize(() => this.submitting.set(false)))
       .subscribe({
-        next: (movement) => this.dialogRef.close(movement),
+        next: (movement) => {
+          this.submissions.complete(command);
+          this.dialogRef.close(movement);
+        },
         error: (error: unknown) => {
+          // These responses confirm that validation/business lookup failed before commit.
+          // Authentication failures and uncertain outcomes retain the frozen original command.
+          const status =
+            typeof error === 'object' && error !== null && 'status' in error ? error.status : null;
+          if (status === 400 || status === 404 || status === 422) {
+            this.submissions.complete(command);
+            this.pendingSubmission.set(null);
+            this.form.enable({ emitEvent: false });
+          }
           this.applyFieldErrors(apiFieldErrors(error));
           this.errorMessage.set(
             apiErrorMessage(
@@ -124,21 +188,6 @@ export class MovementFormDialogComponent {
 
   protected serverError(controlName: keyof typeof this.form.controls): string | null {
     return (this.form.controls[controlName].getError('server') as string | undefined) ?? null;
-  }
-
-  private loadBatches(productId: number): void {
-    this.loadingBatches.set(true);
-    this.service
-      .loadBatches(productId)
-      .pipe(
-        finalize(() => this.loadingBatches.set(false)),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: (page) => this.batches.set(page.content),
-        error: (error: unknown) =>
-          this.errorMessage.set(apiErrorMessage(error, 'No se pudieron cargar los lotes.')),
-      });
   }
 
   private applyFieldErrors(errors: Readonly<Record<string, string>>): void {

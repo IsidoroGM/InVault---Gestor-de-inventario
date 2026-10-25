@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 
 import { NetworkStatusService } from '../network-status.service';
 import { PwaLifecycleService } from '../pwa-lifecycle.service';
+import { InventoryRealtimeService } from '../../realtime/inventory-realtime.service';
 
 @Component({
   selector: 'app-pwa-status-bar',
@@ -14,4 +15,5 @@ import { PwaLifecycleService } from '../pwa-lifecycle.service';
 export class PwaStatusBarComponent {
   protected readonly network = inject(NetworkStatusService);
   protected readonly pwa = inject(PwaLifecycleService);
+  protected readonly realtime = inject(InventoryRealtimeService);
 }

@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { forkJoin, Observable } from 'rxjs';
+import { EMPTY, expand, forkJoin, Observable, reduce } from 'rxjs';
 
 import { ApiClient } from '../../core/services/api-client.service';
 import { PageResponse } from '../../shared/models/page-response.model';
@@ -40,13 +40,24 @@ export class MovementService {
     });
   }
 
-  loadBatches(productId: number): Observable<PageResponse<MovementBatchOption>> {
-    return this.api.get<PageResponse<MovementBatchOption>>(
-      `/api/batches/product/${productId}?page=0&size=100`,
+  loadBatches(productId: number): Observable<readonly MovementBatchOption[]> {
+    const loadPage = (page: number) =>
+      this.api.get<PageResponse<MovementBatchOption>>(
+        `/api/batches/product/${productId}?page=${page}&size=100`,
+      );
+
+    return loadPage(0).pipe(
+      expand((page) => (page.last ? EMPTY : loadPage(page.page + 1)), 1),
+      reduce(
+        (batches, page) => [...batches, ...page.content],
+        [] as readonly MovementBatchOption[],
+      ),
     );
   }
 
-  create(request: StockMovementRequest): Observable<StockMovement> {
-    return this.api.post<StockMovementRequest, StockMovement>('/api/stock/movements', request);
+  create(request: StockMovementRequest, requestKey: string): Observable<StockMovement> {
+    return this.api.post<StockMovementRequest, StockMovement>('/api/stock/movements', request, {
+      'Idempotency-Key': requestKey,
+    });
   }
 }

@@ -42,6 +42,10 @@ export class ProductFormDialogComponent {
   protected readonly submitting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly editing = this.data.product !== null;
+  protected readonly unitLocked = this.data.product?.unitLocked === true;
+  protected readonly currentUnitMissing =
+    !!this.data.product &&
+    !this.data.catalogs.units.some((unit) => unit.id === this.data.product?.unitId);
 
   protected readonly form = new FormGroup({
     sku: new FormControl(this.data.product?.sku ?? '', {
@@ -71,6 +75,12 @@ export class ProductFormDialogComponent {
     }),
     active: new FormControl(this.data.product?.active ?? true, { nonNullable: true }),
   });
+
+  constructor() {
+    if (this.unitLocked) {
+      this.form.controls.unitId.disable();
+    }
+  }
 
   protected submit(): void {
     if (this.form.invalid || this.submitting()) {
@@ -107,7 +117,8 @@ export class ProductFormDialogComponent {
       description: value.description.trim() || null,
       categoryId: value.categoryId as number,
       locationId: value.locationId as number,
-      unitId: value.unitId as number,
+      unitId:
+        this.unitLocked && this.data.product ? this.data.product.unitId : (value.unitId as number),
       minimumStock: value.minimumStock,
       active: value.active,
     };

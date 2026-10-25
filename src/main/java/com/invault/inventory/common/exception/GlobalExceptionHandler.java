@@ -8,11 +8,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -22,6 +24,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import com.invault.inventory.auth.LoginRateLimitException;
 
 /**
  * Centralized exception handler for the whole REST API.
@@ -31,6 +34,16 @@ import jakarta.validation.ConstraintViolationException;
 public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(LoginRateLimitException.class)
+    public ResponseEntity<ApiRateLimitErrorResponse> handleLoginRateLimit(
+            LoginRateLimitException exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.getRetryAfterSeconds()))
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(new ApiRateLimitErrorResponse(429, "Too Many Requests", exception.getMessage(),
+                        request.getRequestURI(), LocalDateTime.now(), exception.getRetryAfterSeconds()));
+    }
 
     /**
      * Returns a generic authentication error without identifying which credential failed.
@@ -123,6 +136,16 @@ public class GlobalExceptionHandler {
                 "The operation conflicts with existing data.",
                 request
         );
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleConflict(ConflictException exception, HttpServletRequest request) {
+        return errorResponse(HttpStatus.CONFLICT, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingHeader(MissingRequestHeaderException exception, HttpServletRequest request) {
+        return errorResponse(HttpStatus.BAD_REQUEST, "Required request header is missing. Update the application and retry.", request);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

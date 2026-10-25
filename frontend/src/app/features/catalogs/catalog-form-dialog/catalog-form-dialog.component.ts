@@ -57,6 +57,7 @@ export class CatalogFormDialogComponent {
     this.data.kind === 'units' ? (this.data.item as UnitCatalogItem) : null;
   private readonly supplierItem =
     this.data.kind === 'suppliers' ? (this.data.item as SupplierCatalogItem) : null;
+  protected readonly identityLocked = this.unitItem?.identityLocked === true;
 
   protected readonly form = new FormGroup({
     code: new FormControl(this.unitItem?.code ?? '', {
@@ -99,6 +100,14 @@ export class CatalogFormDialogComponent {
     }),
     active: new FormControl(this.data.item?.active ?? true, { nonNullable: true }),
   });
+
+  constructor() {
+    if (this.identityLocked) {
+      this.form.controls.code.disable();
+      this.form.controls.name.disable();
+      this.form.controls.symbol.disable();
+    }
+  }
 
   protected submit(): void {
     if (this.form.invalid || this.submitting()) {
@@ -166,6 +175,14 @@ export class CatalogFormDialogComponent {
   }
 
   private unitRequest(): UnitCatalogRequest {
+    if (this.identityLocked && this.unitItem) {
+      return {
+        ...this.namedRequest(),
+        code: this.unitItem.code,
+        name: this.unitItem.name,
+        symbol: this.unitItem.symbol,
+      };
+    }
     return {
       ...this.namedRequest(),
       code: this.form.controls.code.value.trim().toUpperCase(),

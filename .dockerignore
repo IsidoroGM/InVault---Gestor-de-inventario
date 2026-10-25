@@ -8,3 +8,9 @@ target
 .env
 .env.*
 compose*.yml
+backups
+*.age
+*.agekey
+releases
+src/main/resources/application-dev.yml
+src/main/resources/application-local.yml

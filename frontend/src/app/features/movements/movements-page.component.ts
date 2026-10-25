@@ -7,6 +7,7 @@ import {
   inject,
   OnInit,
   signal,
+  untracked,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -20,7 +21,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
 import { InventoryRealtimeService } from '../../core/realtime/inventory-realtime.service';
@@ -35,6 +36,7 @@ import {
   movementDirection,
 } from './movement.models';
 import { MovementService } from './movement.service';
+import { MovementSubmissionStore } from './movement-submission.store';
 
 @Component({
   selector: 'app-movements-page',
@@ -61,10 +63,11 @@ export class MovementsPageComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly formBuilder = inject(FormBuilder);
   private readonly realtime = inject(InventoryRealtimeService);
+  private inventoryRequest?: Subscription;
   private readonly service = inject(MovementService);
+  private readonly submissions = inject(MovementSubmissionStore);
   private readonly snackBar = inject(MatSnackBar);
   private readonly sessionStore = inject(AuthSessionStore);
-  private lastMovementId: number | null = null;
 
   protected readonly movements = signal<readonly StockMovement[]>([]);
   protected readonly options = signal<MovementFormOptions>({ products: [], suppliers: [] });
@@ -95,17 +98,13 @@ export class MovementsPageComponent implements OnInit {
 
   constructor() {
     effect(() => {
-      const event = this.realtime.lastEvent();
-      if (event && event.movementId !== this.lastMovementId) {
-        this.lastMovementId = event.movementId;
-        this.loadMovements();
-      }
+      this.realtime.refreshVersion();
+      untracked(() => this.loadMovements());
     });
   }
 
   ngOnInit(): void {
     this.loadOptions();
-    this.loadMovements();
     this.filters.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.pageIndex = 0;
       this.loadMovements();
@@ -132,7 +131,7 @@ export class MovementsPageComponent implements OnInit {
   }
 
   protected openCreate(): void {
-    if (this.options().products.length === 0) {
+    if (this.options().products.length === 0 && !this.submissions.hasPending()) {
       this.snackBar.open('No hay productos activos disponibles.', 'Cerrar', { duration: 5000 });
       return;
     }
@@ -173,9 +172,10 @@ export class MovementsPageComponent implements OnInit {
   }
 
   private loadMovements(): void {
+    this.inventoryRequest?.unsubscribe();
     this.loading.set(true);
     this.errorMessage.set(null);
-    this.service
+    this.inventoryRequest = this.service
       .search({
         productId: this.filters.controls.productId.value,
         movementType: this.filters.controls.movementType.value,

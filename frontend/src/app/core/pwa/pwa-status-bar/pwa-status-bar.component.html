@@ -9,6 +9,13 @@
         >
       </div>
     </section>
+  } @else if (realtime.state() === 'disconnected' || realtime.state() === 'error') {
+    <section class="status-message offline" role="status">
+      <div>
+        <strong>Actualización en directo interrumpida</strong>
+        <span>Los datos pueden estar desactualizados. Se recargarán al recuperar la conexión.</span>
+      </div>
+    </section>
   }
 
   @if (pwa.updateAvailable()) {

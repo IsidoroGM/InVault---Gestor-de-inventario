@@ -44,6 +44,7 @@ import com.invault.inventory.products.dto.ProductRequestDTO;
 import com.invault.inventory.products.dto.ProductResponseDTO;
 import com.invault.inventory.stock.StockController;
 import com.invault.inventory.stock.StockService;
+import com.invault.inventory.stock.StockMovementCommandService;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.suppliers.SupplierController;
@@ -64,6 +65,7 @@ class RestControllerTests {
     private ProductService productService;
     private BatchService batchService;
     private StockService stockService;
+    private StockMovementCommandService movementCommands;
 
     private MockMvc mockMvc;
 
@@ -76,6 +78,7 @@ class RestControllerTests {
         productService = mock(ProductService.class);
         batchService = mock(BatchService.class);
         stockService = mock(StockService.class);
+        movementCommands = mock(StockMovementCommandService.class);
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new UnitController(unitService),
@@ -84,7 +87,7 @@ class RestControllerTests {
                         new SupplierController(supplierService),
                         new ProductController(productService),
                         new BatchController(batchService),
-                        new StockController(stockService)
+                        new StockController(stockService, movementCommands)
                 )
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -131,7 +134,7 @@ class RestControllerTests {
         when(supplierService.create(any(SupplierRequestDTO.class))).thenReturn(new SupplierResponseDTO());
         when(productService.create(any(ProductRequestDTO.class))).thenReturn(new ProductResponseDTO());
         when(batchService.create(any(BatchRequestDTO.class))).thenReturn(new BatchResponseDTO());
-        when(stockService.createMovement(any(StockMovementRequestDTO.class), any(Long.class)))
+        when(movementCommands.execute(any(StockMovementRequestDTO.class), any(Long.class), any(String.class)))
                 .thenReturn(new StockMovementResponseDTO());
 
         performPost("/api/units", "{\"code\":\"KG\",\"name\":\"Kilogram\"}");
@@ -144,6 +147,7 @@ class RestControllerTests {
                 """);
         performPost("/api/batches", "{\"productId\":1,\"batchCode\":\"LOT-001\"}");
         mockMvc.perform(post("/api/stock/movements")
+                        .header("Idempotency-Key", "2b4e8f96-9d25-49da-a4f3-d6fe532c947e")
                         .principal(jwtAuthentication(3L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -223,6 +227,27 @@ class RestControllerTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.quantity")
                         .value("Movement quantity must be greater than zero."));
+    }
+
+    @Test
+    void movementRequiresAnIdempotencyKey() throws Exception {
+        mockMvc.perform(post("/api/stock/movements")
+                        .principal(jwtAuthentication(3L)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"productId\":1,\"batchId\":2,\"movementType\":\"INBOUND\",\"quantity\":1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Required request header is missing. Update the application and retry."));
+        org.mockito.Mockito.verifyNoInteractions(movementCommands);
+    }
+
+    @Test
+    void movementRejectsQuantitiesThatTheDatabaseWouldRound() throws Exception {
+        mockMvc.perform(post("/api/stock/movements")
+                        .header("Idempotency-Key", "2b4e8f96-9d25-49da-a4f3-d6fe532c947e")
+                        .principal(jwtAuthentication(3L)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"productId\":1,\"batchId\":2,\"movementType\":\"INBOUND\",\"quantity\":1.0001}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.quantity").exists());
+        org.mockito.Mockito.verifyNoInteractions(movementCommands);
     }
 
     @Test

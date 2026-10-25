@@ -10,6 +10,10 @@ import java.time.LocalDateTime;
  * It includes basic information about related Category, Location and Unit.
  */
 public class ProductResponseDTO {
+    private boolean unitLocked;
+
+    public boolean isUnitLocked() { return unitLocked; }
+    public void setUnitLocked(boolean value) { unitLocked = value; }
 
     private Long id;
     private String sku;

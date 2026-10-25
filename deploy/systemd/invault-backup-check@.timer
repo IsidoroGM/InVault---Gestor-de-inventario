@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly InVault backup check for company %i
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=2min
+Persistent=true
+Unit=invault-backup-check@%i.service
+
+[Install]
+WantedBy=timers.target

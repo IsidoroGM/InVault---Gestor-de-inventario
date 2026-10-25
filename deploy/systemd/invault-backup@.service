@@ -1,0 +1,21 @@
+[Unit]
+Description=Encrypted InVault backup for company %i
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=invault-backup
+SupplementaryGroups=docker
+UMask=0077
+WorkingDirectory=/opt/invault
+ExecStart=/usr/bin/pwsh -NoProfile -NonInteractive -File /opt/invault/deploy/backup-company.ps1 -CompanyId %i -EnvironmentFile /etc/invault/%i.env -RecipientFile /etc/invault/backup-recipients.txt -OutputDirectory /var/backups/invault/%i -AgeExecutable /opt/invault-tools/age/age
+TimeoutStartSec=30min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/invault/%i
+
+[Install]
+WantedBy=multi-user.target

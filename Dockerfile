@@ -13,6 +13,9 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 FROM eclipse-temurin:25.0.2_10-jre
 
+ARG INVAULT_BUILD_REVISION=unversioned
+LABEL org.opencontainers.image.revision="$INVAULT_BUILD_REVISION"
+
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
@@ -28,6 +31,6 @@ EXPOSE 8080
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Duser.timezone=UTC"
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=45s --retries=5 \
-  CMD curl --fail --silent --show-error http://localhost:8080/actuator/health >/dev/null || exit 1
+  CMD curl --fail --silent --show-error --max-time 4 --connect-timeout 2 http://localhost:8080/api/health/readiness >/dev/null || exit 1
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

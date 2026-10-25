@@ -26,7 +26,7 @@ public class UnitMapper {
             return null;
         }
 
-        return new UnitResponseDTO(
+        UnitResponseDTO response = new UnitResponseDTO(
                 unit.getId(),
                 unit.getCode(),
                 unit.getName(),
@@ -36,6 +36,8 @@ public class UnitMapper {
                 unit.getCreatedAt(),
                 unit.getUpdatedAt()
         );
+        response.setIdentityLocked(unit.isIdentityLocked());
+        return response;
     }
 
     /**

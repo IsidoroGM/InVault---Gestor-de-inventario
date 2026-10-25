@@ -7,6 +7,8 @@
     }
 
     reverse_proxy frontend:8080 {
+        header_up -Forwarded
+        header_up -X-Forwarded-Prefix
         health_uri /healthz
         health_interval 30s
         health_timeout 5s

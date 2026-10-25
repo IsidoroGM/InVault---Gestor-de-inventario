@@ -28,6 +28,16 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "products")
 public class Product {
+    @Column(name = "unit_locked", nullable = false)
+    private boolean unitLocked;
+
+    public boolean isUnitLocked() {
+        return unitLocked;
+    }
+
+    public void lockUnit() {
+        unitLocked = true;
+    }
 
     // Primary key generated automatically by the database.
     @Id

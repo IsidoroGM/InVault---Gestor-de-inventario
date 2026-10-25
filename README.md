@@ -14,6 +14,12 @@ The current user interface is in Spanish. Source code, API contracts, database o
 
 ## Project status
 
+The current release candidate is **0.1.0-rc.1**, identified by the Git tag
+`v0.1.0-rc.1`. See [release notes](CHANGELOG.md) and the
+[candidate handover in Spanish](deploy/RELEASE_CANDIDATE_ES.md) for its scope,
+verification and outstanding acceptance work. Backend and frontend share this
+application version; the Spring Boot parent keeps its own independent version.
+
 The full-stack MVP is implemented. The repository currently includes:
 
 - A production-oriented Spring Boot backend with JWT authentication, four official roles, transactional auditing, Flyway migrations, OpenAPI documentation in development, and authenticated STOMP events.
@@ -34,6 +40,7 @@ This is a serious MVP rather than a finished multi-site warehouse platform. The 
 - Management of products, units, categories, locations, suppliers, and batches.
 - Logical deactivation instead of destructive deletion for master data.
 - Auditable inbound, outbound, positive-adjustment, and negative-adjustment stock movements.
+- Persistent movement request keys prevent duplicate effects when a submitted operation is retried.
 - Batch-level balances, product-level aggregated stock, minimum-stock thresholds, and low-stock indicators.
 - Dashboard indicators and recent operational activity.
 - Pessimistic locking of batches to protect stock integrity under concurrent operations.
@@ -57,6 +64,7 @@ The product table does not contain an editable `currentStock` field. Current pro
 The main business rules are:
 
 - Batch quantity cannot be changed through product or batch maintenance forms.
+- A batch's product is fixed at creation; editing a batch cannot transfer stock or history to another product.
 - Every stock change must be represented by a stock movement.
 - Movement quantities are positive; the movement type determines whether stock increases or decreases.
 - Stock cannot become negative.
@@ -107,7 +115,7 @@ In local development, Angular runs on port `4200` and talks directly to Spring B
 | Database          | MySQL 8.4 LTS                                              | Relational storage for identities, catalogue data, batches, movements, and audit history.            |
 | Migrations        | Flyway                                                     | Reproducible and versioned production schema changes.                                                |
 | API documentation | Springdoc OpenAPI 3                                        | Interactive Swagger documentation during development.                                                |
-| Backend testing   | JUnit, Spring Test, H2 in MySQL mode                       | Unit, security, controller, migration, transaction, and integration-level regression tests.          |
+| Backend testing   | JUnit, Spring Test, H2 and real MySQL 8.4                  | Unit, security, controller, migration, transaction, concurrency, and company-isolation tests.          |
 | Frontend testing  | Vitest through Angular CLI                                 | Unit tests for services, guards, interceptors, PWA behavior, and feature components.                 |
 | Build             | Maven Wrapper, npm lockfile, Angular CLI                   | Reproducible backend and frontend builds.                                                            |
 | Containers        | Docker, Docker Compose                                     | Repeatable builds and orchestration of the full production stack.                                    |
@@ -152,7 +160,7 @@ Additional safeguards prevent users from deactivating themselves or removing/dea
 │   ├── audit, realtime, config, common
 │   └── InVaultBackendApplication.java
 ├── src/main/resources
-│   ├── db/migration                 # Flyway V1-V3
+│   ├── db/migration                 # Flyway V1-V6
 │   ├── application.yml
 │   ├── application-dev.example.yml
 │   └── application-prod.yml
@@ -262,11 +270,22 @@ Backend:
 .\mvnw.cmd --batch-mode --no-transfer-progress clean verify
 ```
 
+Backend CI also runs the `mysql-it` profile against a disposable MySQL 8.4 service.
+To run that full check locally on Windows:
+
+```powershell
+.\deploy\test-mysql.ps1 -MySqlHome 'C:\tools\mysql-8.4.13-winx64'
+```
+
+See [real MySQL verification](deploy/MYSQL_TESTS.md) for setup, Docker commands,
+test coverage, cleanup and report locations.
+
 Frontend:
 
 ```powershell
 Set-Location frontend
 npm ci
+npm audit --audit-level=high
 npm run format:check
 npm run test:ci
 npm run build
@@ -295,7 +314,15 @@ Paginated responses expose `content`, `page`, `size`, `totalElements`, `totalPag
 
 API errors use a consistent JSON structure containing HTTP status, error, message, path, and timestamp. Validation failures also provide a `fieldErrors` object that the frontend maps to form controls.
 
-The frontend connects to `/ws`, sends the bearer token in the STOMP `CONNECT` frame, and subscribes only to `/topic/inventory`. Clients are not permitted to publish messages through STOMP. The current backend uses an in-memory simple broker and publishes `STOCK_UPDATED` after a successful commit.
+Stock movement creation requires a UUID `Idempotency-Key` header. Repeating the
+same key and payload as the same user returns the original HTTP 201 response;
+changing its payload returns 409. The browser retains an unconfirmed submission
+for explicit retry in the same tab session. See [movement retry protection](deploy/MOVEMENT_IDEMPOTENCY.md)
+for transaction behavior, client recovery and rollout requirements.
+
+The frontend connects to `/ws`, sends the bearer token in the STOMP `CONNECT` frame, and subscribes only to `/topic/inventory`. Clients are not permitted to publish messages through STOMP. The current backend uses an in-memory simple broker and publishes `STOCK_UPDATED` for movements and `BATCH_CHANGED` for batch creation or maintenance after a successful commit.
+
+`BATCH_CHANGED` identifies the product and batch and includes the current batch quantity; movement-specific fields are null. Clients refresh authoritative REST data for either event and after every connection or reconnection, including when no new movement arrives. In-flight inventory reads are cancelled when a newer refresh starts so late responses cannot replace newer data.
 
 ## Database and migrations
 
@@ -306,10 +333,23 @@ Production uses Flyway as the schema authority and Hibernate in validation mode:
 | `V1__create_inventory_schema.sql` | Creates the identity, catalogue, product, batch, stock movement, and audit tables with foreign keys and indexes. |
 | `V2__add_audit_snapshots.sql`     | Adds before/after snapshots to audit records.                                                                    |
 | `V3__add_user_token_version.sql`  | Adds the token version used for immediate JWT revocation.                                                        |
+| `V4__add_stock_movement_requests.sql` | Stores movement request fingerprints and committed responses for safe retries. |
+| `V5__add_login_rate_limits.sql` | Persists per-account/source login budgets across restarts and backend instances. |
+| `V6__preserve_measurement_identity.sql` | Backfills and persists unit identity/product measurement locks. |
 
-The business schema contains `roles`, `users`, `user_roles`, `units`, `categories`, `locations`, `suppliers`, `products`, `batches`, `stock_movements`, and `audit_logs`, plus Flyway's technical history table.
+The application schema contains `roles`, `users`, `user_roles`, `units`, `categories`, `locations`, `suppliers`, `products`, `batches`, `stock_movements`, `audit_logs`, `stock_movement_requests`, and `login_rate_limits`, plus Flyway's technical history table.
 
 The default development profile keeps Flyway disabled and uses the ignored local configuration with `ddl-auto: update`. This is a development convenience only. Production enables Flyway and uses `ddl-auto: validate`.
+
+Login requests have persistent per-account/source budgets (10/50 attempts in five
+minutes by default). A rejected request returns HTTP 429 with `Retry-After`; the
+PWA displays a countdown and requires an explicit retry. Successful logins also
+consume the budget. See [login security](deploy/LOGIN_SECURITY.md) for configuration,
+audit, proxy trust and production-chain verification.
+
+Once used by a product, a unit keeps its code, name and symbol. Once a product
+has a batch, it keeps its unit even when stock returns to zero. Forms reflect
+these persisted rules; see [measurement identity](deploy/MEASUREMENT_IDENTITY.md).
 
 ## Production deployment
 
@@ -322,20 +362,30 @@ The supported Compose deployment targets a single Linux host with Docker Engine 
 
 Before deploying, point the domain to the host and allow inbound TCP `80/443` and UDP `443`.
 
-```bash
-cp .env.production.example .env
-# Replace every example domain, password, and secret in .env.
+With PowerShell 7.3+, build from a clean committed checkout:
 
-docker compose --env-file .env --file compose.prod.yml config --quiet
-docker compose --env-file .env --file compose.prod.yml up --detach --build
-docker compose --env-file .env --file compose.prod.yml ps
+```powershell
+$company = ./deploy/new-company.ps1 -CompanyId company-a -Domain inventory.example.com -AdminEmail admin@inventory.example.com
+$release = ./deploy/build-release.ps1
+./deploy/check-company.ps1 -CompanyId company-a -EnvironmentFile $company.EnvironmentFile -ConfigurationOnly
+docker compose --project-name $company.ProjectName --env-file $company.EnvironmentFile --file compose.prod.yml --file $release.ComposeFile up --detach --no-build --wait
+./deploy/check-company.ps1 -CompanyId company-a -EnvironmentFile $company.EnvironmentFile -ExpectedRevision $release.Revision
 ```
 
 Keep bootstrap administration enabled only for the first deployment. Change the temporary password, disable the bootstrap flag, clear its credential values, and recreate the backend service.
 
-Do not run `docker compose down --volumes` in production: that removes the MySQL volume. Back up the database before updates and store encrypted copies away from the host.
+Do not run `docker compose down --volumes` in production: that removes the MySQL volume. Back up the database before updates and store encrypted copies away from the host. [Company backup and recovery scripts](deploy/BACKUPS.md) include encryption, an isolated restore and systemd scheduling templates.
 
 See [deploy/README.md](deploy/README.md) for the complete first-deployment, update, backup, and operations procedure.
+
+[Identified releases](deploy/RELEASES.md) record the actual image revision and IDs.
+The [company diagnostic](deploy/COMPANY_DIAGNOSTICS.md) checks configuration,
+runtime isolation and database readiness; public DNS/TLS and device acceptance
+remain separate checks.
+
+For distribution to several companies, use [independent company deployments](deploy/COMPANY_DEPLOYMENTS.md).
+Each company has its own database, persistent volume, application services, credentials, JWT key and HTTPS origin.
+The configuration generator creates a private environment file for each company without starting services.
 
 ### Required production configuration
 
@@ -403,18 +453,21 @@ The project was built incrementally. The main completed milestones are:
 8. **Operational frontend:** products, catalogues, batches, movements, stock summaries, dashboard, live refresh, user administration, and audit explorer.
 9. **Production delivery:** multi-stage container images, MySQL persistence, Nginx reverse proxy, Caddy HTTPS gateway, health checks, security restrictions, deployment documentation, and CI validation.
 10. **PWA and tablet readiness:** install manifest and icons, service worker updates, responsive/touch behavior, offline mutation blocking, device acceptance checklist, and disposable HTTPS preview workflow.
+11. **Company isolation and recovery:** independent company configuration, real-MySQL isolation checks, encrypted backups, isolated recovery and backup supervision.
+12. **Inventory and access integrity:** persistent movement idempotency, login budgets and measurement identity, including Flyway V4-V6 and concurrent MySQL verification.
+13. **Operational readiness and release identity:** database-aware health checks, company diagnostics, source-only image builds and deployed-image revision in backup metadata.
 
 ## Current boundaries and future work
 
 The following items are not part of the current implementation or remain recommended hardening work:
 
-- Run automated integration tests against real MySQL, for example with Testcontainers, in addition to H2's MySQL compatibility mode.
-- Add login rate limiting, abuse monitoring, and operational alerting.
+- Complete deployment acceptance with independent MySQL volumes, container/database restart and backup restoration; automated real-MySQL integration checks already cover migrations, concurrency, rollback, company isolation and application restart.
+- Connect the existing login-throttling audit and company/backup diagnostics to operational alerts on the target hosts. Persistent login rate limiting is already implemented.
 - Add metrics, distributed tracing, richer structured logs, and correlation IDs.
-- Add coverage thresholds, dependency scanning, and static application security testing.
+- Add full browser-flow tests, load tests, coverage thresholds, backend/image dependency scanning, and static application security testing. Frontend CI already audits npm dependencies.
 - Replace the in-memory STOMP broker before horizontally scaling the backend.
 - Introduce per-device sessions if global user token revocation is too coarse for future requirements.
-- Add backup automation and periodically verified restoration procedures for production.
+- Activate per-company backup timers, external replicas and recovery acceptance on the production hosts; encrypted backup and isolated restoration scripts are already verified in CI.
 - Add CSV/Excel import and export, advanced reporting, notifications, and multi-warehouse support.
 - Add QR/barcode workflows.
 - Add explicitly designed offline data synchronization only if the business accepts its conflict and freshness model. The current PWA intentionally does not queue offline mutations.

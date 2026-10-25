@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 import java.time.Instant;
 import java.util.List;
@@ -40,6 +41,7 @@ import com.invault.inventory.categories.dto.CategoryRequestDTO;
 import com.invault.inventory.categories.dto.CategoryResponseDTO;
 import com.invault.inventory.common.dto.PageResponseDTO;
 import com.invault.inventory.stock.StockService;
+import com.invault.inventory.stock.StockMovementCommandService;
 import com.invault.inventory.stock.dto.StockMovementRequestDTO;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
 import com.invault.inventory.units.UnitService;
@@ -67,6 +69,9 @@ class SecurityAuthorizationTests {
 
     @MockitoBean
     private StockService stockService;
+
+    @MockitoBean
+    private StockMovementCommandService movementCommands;
 
     @MockitoBean
     private UserService userService;
@@ -100,6 +105,12 @@ class SecurityAuthorizationTests {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(get("/api/health/readiness"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.components").doesNotExist());
+
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
@@ -110,6 +121,21 @@ class SecurityAuthorizationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.roles[0]").value("ADMIN"));
+    }
+
+    @Test
+    void throttledLoginReturnsRetryDelayWithoutRevealingAccountState() throws Exception {
+        when(authService.login(any(LoginRequestDTO.class), anyString())).thenThrow(new LoginRateLimitException(42));
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .header("Origin", "http://localhost:4200")
+                        .content("{\"username\":\"unknown\",\"password\":\"secret-password\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "42"))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Access-Control-Expose-Headers", "Authorization, Retry-After"))
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.retryAfterSeconds").value(42))
+                .andExpect(jsonPath("$.message").value("Too many login attempts. Please wait before trying again."));
     }
 
     @Test
@@ -180,11 +206,12 @@ class SecurityAuthorizationTests {
                         .content(requestBody))
                 .andExpect(status().isForbidden());
 
-        when(stockService.createMovement(any(StockMovementRequestDTO.class), any(Long.class)))
+        when(movementCommands.execute(any(StockMovementRequestDTO.class), any(Long.class), any(String.class)))
                 .thenReturn(new StockMovementResponseDTO());
 
         mockMvc.perform(post("/api/stock/movements")
                         .header("Authorization", bearerToken("WAREHOUSE"))
+                        .header("Idempotency-Key", "2b4e8f96-9d25-49da-a4f3-d6fe532c947e")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isCreated());
@@ -201,14 +228,17 @@ class SecurityAuthorizationTests {
 
     @Test
     void corsAllowsConfiguredFrontendAndRejectsOtherOrigins() throws Exception {
-        mockMvc.perform(options("/api/products")
+        mockMvc.perform(options("/api/stock/movements")
                         .header("Origin", "http://localhost:4200")
-                        .header("Access-Control-Request-Method", "GET"))
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "Authorization,Content-Type,Idempotency-Key"))
                 .andExpect(status().isOk())
                 .andExpect(result -> {
                     String origin = result.getResponse().getHeader("Access-Control-Allow-Origin");
                     org.assertj.core.api.Assertions.assertThat(origin)
                             .isEqualTo("http://localhost:4200");
+                    org.assertj.core.api.Assertions.assertThat(result.getResponse().getHeader("Access-Control-Allow-Headers"))
+                            .contains("Idempotency-Key");
                 });
 
         mockMvc.perform(options("/api/products")

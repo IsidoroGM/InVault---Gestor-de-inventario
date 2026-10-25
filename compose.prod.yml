@@ -19,7 +19,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "mysqladmin ping --host=localhost --user=root --password=$${MYSQL_ROOT_PASSWORD} --silent",
+          'MYSQL_PWD="$${MYSQL_PASSWORD}" mysql --protocol=TCP --host=127.0.0.1 --user="$${MYSQL_USER}" --database="$${MYSQL_DATABASE}" --batch --skip-column-names --execute="SELECT 1"',
         ]
       interval: 10s
       timeout: 5s
@@ -34,6 +34,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        INVAULT_BUILD_REVISION: ${INVAULT_BUILD_REVISION:-unversioned}
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -52,6 +54,9 @@ services:
       INVAULT_JWT_SECRET: ${INVAULT_JWT_SECRET:?Set INVAULT_JWT_SECRET in .env}
       INVAULT_JWT_ISSUER: ${INVAULT_JWT_ISSUER:?Set INVAULT_JWT_ISSUER in .env}
       INVAULT_JWT_EXPIRATION: ${INVAULT_JWT_EXPIRATION:-30m}
+      INVAULT_LOGIN_ACCOUNT_ATTEMPTS: ${INVAULT_LOGIN_ACCOUNT_ATTEMPTS:-10}
+      INVAULT_LOGIN_IP_ATTEMPTS: ${INVAULT_LOGIN_IP_ATTEMPTS:-50}
+      INVAULT_LOGIN_WINDOW: ${INVAULT_LOGIN_WINDOW:-5m}
       INVAULT_BOOTSTRAP_ADMIN_ENABLED: ${INVAULT_BOOTSTRAP_ADMIN_ENABLED:-false}
       INVAULT_BOOTSTRAP_ADMIN_USERNAME: ${INVAULT_BOOTSTRAP_ADMIN_USERNAME:-}
       INVAULT_BOOTSTRAP_ADMIN_EMAIL: ${INVAULT_BOOTSTRAP_ADMIN_EMAIL:-}
@@ -68,7 +73,11 @@ services:
           "curl",
           "--fail",
           "--silent",
-          "http://localhost:8080/actuator/health",
+          "--max-time",
+          "4",
+          "--connect-timeout",
+          "2",
+          "http://localhost:8080/api/health/readiness",
         ]
       interval: 15s
       timeout: 5s
@@ -88,6 +97,8 @@ services:
     build:
       context: frontend
       dockerfile: Dockerfile
+      args:
+        INVAULT_BUILD_REVISION: ${INVAULT_BUILD_REVISION:-unversioned}
     restart: unless-stopped
     depends_on:
       backend:

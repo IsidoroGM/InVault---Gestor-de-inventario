@@ -9,6 +9,7 @@ interface ErrorPayload {
   readonly path?: unknown;
   readonly timestamp?: unknown;
   readonly fieldErrors?: unknown;
+  readonly retryAfterSeconds?: unknown;
 }
 
 export function normalizeApiError(error: unknown, requestUrl: string): ApiErrorResponse {
@@ -27,6 +28,7 @@ export function normalizeApiError(error: unknown, requestUrl: string): ApiErrorR
       path: asString(payload?.path, requestUrl),
       timestamp: asString(payload?.timestamp, new Date().toISOString()),
       fieldErrors: asFieldErrors(payload?.fieldErrors),
+      retryAfterSeconds: retryDelay(payload?.retryAfterSeconds, error.headers.get('Retry-After')),
     };
   }
 
@@ -37,6 +39,13 @@ export function normalizeApiError(error: unknown, requestUrl: string): ApiErrorR
     path: requestUrl,
     timestamp: new Date().toISOString(),
   };
+}
+
+function retryDelay(payload: unknown, header: string | null): number | undefined {
+  const seconds = typeof payload === 'number' ? payload : header === null ? NaN : Number(header);
+  return Number.isFinite(seconds) && seconds > 0 && seconds <= 3600
+    ? Math.ceil(seconds)
+    : undefined;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

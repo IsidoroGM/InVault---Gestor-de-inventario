@@ -1,7 +1,8 @@
 package com.invault.inventory.realtime;
 
 public enum InventoryEventType {
-    STOCK_UPDATED
+    STOCK_UPDATED,
+    BATCH_CHANGED
 }
 
 /*

@@ -24,6 +24,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    services:
+      mysql:
+        image: mysql:8.4.11
+        env:
+          MYSQL_ROOT_PASSWORD: invault-disposable-ci-only
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    env:
+      INVAULT_TEST_MYSQL_HOST: 127.0.0.1
+      INVAULT_TEST_MYSQL_PORT: "3306"
+      INVAULT_TEST_MYSQL_USERNAME: root
+      INVAULT_TEST_MYSQL_PASSWORD: invault-disposable-ci-only
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -36,4 +56,4 @@ jobs:
           cache: maven
 
       - name: Compile, test and package backend
-        run: bash ./mvnw --batch-mode --no-transfer-progress clean verify
+        run: bash ./mvnw --batch-mode --no-transfer-progress clean verify -Pmysql-it

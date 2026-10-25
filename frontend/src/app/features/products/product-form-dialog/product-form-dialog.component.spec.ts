@@ -74,6 +74,53 @@ describe('ProductFormDialogComponent', () => {
     expect(testable.form.controls['sku'].touched).toBe(true);
   });
 
+  const measuredProduct: Product = {
+    id: 1,
+    sku: 'MATERIAL-001',
+    name: 'Material',
+    description: null,
+    categoryId: 1,
+    categoryName: 'Materiales',
+    locationId: 2,
+    locationName: 'Almacén',
+    unitId: 9,
+    unitCode: 'KG',
+    unitName: 'Kilogramo',
+    unitSymbol: 'kg',
+    minimumStock: 0,
+    active: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+
+  it('preserves a locked unit, including when absent from active catalogues', async () => {
+    await createComponent({ product: { ...measuredProduct, unitLocked: true }, catalogs });
+    const fixture = TestBed.createComponent(ProductFormDialogComponent);
+    const component = fixture.componentInstance as unknown as TestableProductFormDialog;
+    expect(component.form.controls['unitId'].disabled).toBe(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Kilogramo');
+    component.form.patchValue({ unitId: 3, name: 'Material revisado' });
+    component.submit();
+    expect(service.update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ unitId: 9, name: 'Material revisado' }),
+    );
+  });
+
+  it('allows an unused product to select another unit', async () => {
+    const component = (await createComponent({
+      product: { ...measuredProduct, unitLocked: false },
+      catalogs,
+    })) as unknown as TestableProductFormDialog;
+    expect(component.form.controls['unitId'].enabled).toBe(true);
+    component.form.patchValue({ unitId: 3 });
+    component.submit();
+    expect(service.update).toHaveBeenCalledWith(1, expect.objectContaining({ unitId: 3 }));
+  });
+
   async function createComponent(data: ProductFormDialogData): Promise<ProductFormDialogComponent> {
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({

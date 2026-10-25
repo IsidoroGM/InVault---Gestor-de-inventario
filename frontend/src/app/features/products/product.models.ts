@@ -1,4 +1,5 @@
 export interface Product {
+  readonly unitLocked?: boolean;
   readonly id: number;
   readonly sku: string;
   readonly name: string;

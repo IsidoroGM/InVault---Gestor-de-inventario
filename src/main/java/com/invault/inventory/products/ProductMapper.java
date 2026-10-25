@@ -34,7 +34,7 @@ public class ProductMapper {
         Location location = product.getLocation();
         Unit unit = product.getUnit();
 
-        return new ProductResponseDTO(
+        ProductResponseDTO response = new ProductResponseDTO(
                 product.getId(),
                 product.getSku(),
                 product.getName(),
@@ -56,6 +56,8 @@ public class ProductMapper {
                 product.getCreatedAt(),
                 product.getUpdatedAt()
         );
+        response.setUnitLocked(product.isUnitLocked());
+        return response;
     }
 
     /**

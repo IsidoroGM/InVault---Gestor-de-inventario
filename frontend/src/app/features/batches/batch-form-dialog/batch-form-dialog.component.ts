@@ -49,9 +49,10 @@ export class BatchFormDialogComponent {
   protected readonly errorMessage = signal<string | null>(null);
 
   protected readonly form = new FormGroup({
-    productId: new FormControl<number | null>(this.data.batch?.productId ?? null, [
-      Validators.required,
-    ]),
+    productId: new FormControl<number | null>(
+      { value: this.data.batch?.productId ?? null, disabled: this.editing },
+      [Validators.required],
+    ),
     batchCode: new FormControl(this.data.batch?.batchCode ?? '', {
       nonNullable: true,
       validators: [Validators.required, Validators.maxLength(100)],

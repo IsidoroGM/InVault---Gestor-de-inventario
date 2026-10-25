@@ -2,15 +2,17 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
-  OnInit,
   signal,
+  untracked,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
 import { InventoryRealtimeService } from '../../core/realtime/inventory-realtime.service';
@@ -25,11 +27,12 @@ import { StockService } from './stock.service';
   styleUrl: './stock-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class StockPageComponent implements OnInit {
+export class StockPageComponent {
   private readonly realtime = inject(InventoryRealtimeService);
+  private readonly destroyRef = inject(DestroyRef);
+  private inventoryRequest?: Subscription;
   private readonly service = inject(StockService);
   private readonly sessionStore = inject(AuthSessionStore);
-  private lastMovementId: number | null = null;
 
   protected readonly stock = signal<readonly ProductStock[]>([]);
   protected readonly query = signal('');
@@ -58,17 +61,11 @@ export class StockPageComponent implements OnInit {
 
   constructor() {
     effect(() => {
-      const event = this.realtime.lastEvent();
-      if (event && event.movementId !== this.lastMovementId) {
-        this.lastMovementId = event.movementId;
-        this.loadStock();
-      }
+      this.realtime.refreshVersion();
+      untracked(() => this.loadStock());
     });
   }
 
-  ngOnInit(): void {
-    this.loadStock();
-  }
   protected updateQuery(event: Event): void {
     this.query.set((event.target as HTMLInputElement).value);
   }
@@ -80,11 +77,15 @@ export class StockPageComponent implements OnInit {
   }
 
   private loadStock(): void {
+    this.inventoryRequest?.unsubscribe();
     this.loading.set(true);
     this.errorMessage.set(null);
-    this.service
+    this.inventoryRequest = this.service
       .findAll()
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(
+        finalize(() => this.loading.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: (stock) => this.stock.set(stock),
         error: (error: unknown) => {

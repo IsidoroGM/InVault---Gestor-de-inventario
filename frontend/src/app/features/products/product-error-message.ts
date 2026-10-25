@@ -8,6 +8,12 @@ export function productErrorMessage(error: unknown, fallback: string): string {
     if (error.status === 403) {
       return 'Tu rol no permite modificar productos.';
     }
+    if (
+      error.message ===
+      'A product with batches cannot change its unit of measurement. Create a new product.'
+    ) {
+      return 'El producto ya tiene lotes y debe conservar su unidad de medida. Crea un producto nuevo para otra medida.';
+    }
     return error.message || fallback;
   }
   return fallback;

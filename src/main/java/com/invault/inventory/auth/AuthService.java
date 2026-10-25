@@ -30,23 +30,27 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuditService auditService;
     private final ApplicationEventPublisher eventPublisher;
+    private final LoginRateLimitService loginRateLimit;
 
     public AuthService(
             AuthenticationManager authenticationManager,
             UserRepository userRepository,
             JwtService jwtService,
             AuditService auditService,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            LoginRateLimitService loginRateLimit) {
 
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.auditService = auditService;
         this.eventPublisher = eventPublisher;
+        this.loginRateLimit = loginRateLimit;
     }
 
     public LoginResponseDTO login(LoginRequestDTO requestDTO, String clientIp) {
         String username = requestDTO.username().trim();
+        loginRateLimit.check(username, clientIp);
 
         try {
             authenticationManager.authenticate(

@@ -12,6 +12,13 @@ La versión seleccionada es Angular 21 LTS. Angular 22 requiere Node 24.15 o sup
 
 ## Instalación y arranque
 
+La configuración de npm fija temporalmente `undici` en `7.30.1` para
+`@angular/build`: Angular 21.2.28 mantiene una versión anterior afectada por
+[avisos de seguridad](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c).
+Se conserva Angular 21 y se verifica esta sustitución con instalación limpia,
+pruebas y compilación. Revisar la sustitución cuando Angular publique una versión
+que incorpore la corrección. CI ejecuta `npm audit --audit-level=high`.
+
 ```powershell
 cd frontend
 npm ci
@@ -117,6 +124,13 @@ La compilación de producción registra el service worker de Angular. Para compr
 La barra global informa cuando el dispositivo pierde conexión, ofrece la instalación cuando el navegador expone el evento correspondiente y avisa cuando existe una versión nueva. Los formularios y páginas utilizan puntos de ruptura para tablet y móvil, mientras que las tablas extensas conservan desplazamiento horizontal. En dispositivos táctiles, los controles interactivos tienen un objetivo mínimo de 44 píxeles.
 
 El caché PWA se limita al shell, bundles, fuentes e imágenes. `/api/**` y `/ws/**` se excluyen de navegación y no existen `dataGroups` para respuestas del backend. Un interceptor rechaza cualquier método HTTP distinto de lectura cuando `navigator.onLine` indica que el dispositivo está offline.
+
+Los movimientos enviados conservan una clave y su petición original en sessionStorage
+por usuario mientras no se confirme el resultado. El formulario bloquea el doble
+envío y permite reintentar la misma operación después de perder la respuesta o
+recargar esa pestaña. No prepara movimientos nuevos sin conexión ni los reenvía
+automáticamente al recuperarla. El servidor exige `Idempotency-Key` y devuelve el
+movimiento original; véase [el contrato y sus límites](../deploy/MOVEMENT_IDEMPOTENCY.md).
 
 - Sin QR ni códigos de barras.
 - Sin recuperación autónoma de contraseña; la gestiona un administrador.

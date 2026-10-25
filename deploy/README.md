@@ -1,5 +1,11 @@
 # InVault production deployment
 
+## One database per company
+
+Use an independent deployment for each company, with a unique Compose project,
+database volume, credentials, JWT key and domain. The company configuration generator,
+commands and hosting constraints are documented in [COMPANY_DEPLOYMENTS.md](COMPANY_DEPLOYMENTS.md).
+
 ## HTTPS preview without a domain
 
 For tablet and desktop acceptance testing, Windows with Docker Desktop can expose the
@@ -47,25 +53,33 @@ The host must accept inbound TCP traffic on ports 80 and 443 and UDP traffic on 
 
 ## First deployment
 
+For candidate `v0.1.0-rc.1`, start with the
+[candidate handover](RELEASE_CANDIDATE_ES.md) and [release notes](../CHANGELOG.md).
+The tag identifies application sources; container images are built separately
+with the identified release helper.
+
 1. Install Docker Engine and the Docker Compose plugin on the target host.
 2. Clone the repository and check out the release commit.
-3. Copy `.env.production.example` to `.env`, set `APP_DOMAIN` and `APP_PUBLIC_URL` to the same public HTTPS origin, replace every example credential, and restrict it to the deployment account with `chmod 600 .env`.
-4. Generate the JWT secret from at least 32 random bytes:
+3. Install PowerShell 7.3+ and generate the company's private configuration:
 
-   ```bash
-   openssl rand -base64 32
+   ```powershell
+   $company = ./deploy/new-company.ps1 -CompanyId company-a -Domain inventory.example.com -AdminEmail admin@inventory.example.com
    ```
 
-5. Keep `INVAULT_BOOTSTRAP_ADMIN_ENABLED=true` only for the initial start. The bootstrap password is temporary and the administrator must replace it at first login.
-6. Validate and start the stack:
+4. Build an identified release from the clean committed checkout. See [RELEASES.md](RELEASES.md).
 
-   ```bash
-   docker compose --env-file .env --file compose.prod.yml config --quiet
-   docker compose --env-file .env --file compose.prod.yml up --detach --build
-   docker compose --env-file .env --file compose.prod.yml ps
+   ```powershell
+   $release = ./deploy/build-release.ps1
+   ./deploy/check-company.ps1 -CompanyId company-a -EnvironmentFile $company.EnvironmentFile -ConfigurationOnly
+   docker compose --project-name $company.ProjectName --env-file $company.EnvironmentFile --file compose.prod.yml --file $release.ComposeFile up --detach --no-build --wait
+   ./deploy/check-company.ps1 -CompanyId company-a -EnvironmentFile $company.EnvironmentFile -ExpectedRevision $release.Revision
    ```
 
-7. Confirm `https://your-domain.example/healthz`, sign in, install the PWA from the browser, change the bootstrap password, then set `INVAULT_BOOTSTRAP_ADMIN_ENABLED=false`, clear the three bootstrap identity/credential values and run the `up --detach` command again.
+5. Keep bootstrap enabled only for the initial start. Read its temporary password
+   from the protected configuration and replace it at first login.
+6. Verify public HTTPS and install the PWA. Disable and clear bootstrap settings,
+   then repeat `up` with the same project, environment file and release overlay.
+   Configure the company's backups and monitoring.
 
 ## PWA installation and updates
 
@@ -76,26 +90,60 @@ The host must accept inbound TCP traffic on ports 80 and 443 and UDP traffic on 
 - A newly deployed frontend is downloaded in the background. InVault displays an explicit update action and reloads only after the user accepts it.
 - Complete [`PWA_ACCEPTANCE.md`](PWA_ACCEPTANCE.md) on Windows, Android and iPad before promoting a release.
 
+## Login protection
+
+Each company's database persists account and source-IP login budgets. Defaults are
+10 and 50 attempts in five minutes; both successful and failed attempts count.
+The PWA shows the server's retry delay. See [`LOGIN_SECURITY.md`](LOGIN_SECURITY.md)
+for tuning, audit events, proxy trust and the disposable full-stack smoke test.
+
+## Measurement identity
+
+Units used by products and units assigned to products with batches are protected
+against relabelling. See [`MEASUREMENT_IDENTITY.md`](MEASUREMENT_IDENTITY.md) for
+permitted edits, permanent flags, concurrent creation and the V6 rollout.
+
+## Backup supervision
+
+Use [`check-backups.ps1`](check-backups.ps1) to report absent/stale company backups
+and optional replica hash mismatches. JSON and exit codes support host monitoring;
+an hourly systemd template is provided. See [`BACKUP_MONITORING.md`](BACKUP_MONITORING.md)
+for configuration and the distinction between freshness checks and recovery tests.
+
 ## Updates
 
-Back up the database, fetch the desired release, then rebuild. Flyway applies pending migrations before the backend becomes healthy.
+Build and record the desired release images, back up the running company database,
+then use the release overlay with `up --no-build --wait` for that same project.
+Flyway applies pending migrations before the backend becomes healthy.
+Using a [generated company configuration](COMPANY_DEPLOYMENTS.md):
 
 ```bash
-docker compose --env-file .env --file compose.prod.yml exec -T database \
-  sh -c 'exec mysqldump --single-transaction --user=root --password="$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
-  > "invault-$(date +%Y%m%d-%H%M%S).sql"
-docker compose --env-file .env --file compose.prod.yml up --detach --build
-docker compose --env-file .env --file compose.prod.yml ps
+pwsh -NoProfile -NonInteractive -File ./deploy/backup-company.ps1 \
+  -CompanyId company-a -EnvironmentFile .env.company-company-a \
+  -RecipientFile /etc/invault/backup-recipients.txt \
+  -OutputDirectory /var/backups/invault/company-a
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml --file releases/invault-RELEASE_SHA.compose.json up --detach --no-build --wait
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml ps
 ```
 
-Do not use `docker compose down --volumes` in production: it deletes the MySQL volume. Store encrypted backups outside the host and periodically test restoration.
+Do not use `docker compose down --volumes` in production: it deletes the MySQL volume. Use [encrypted per-company backups and isolated recovery](BACKUPS.md), store copies outside the host and periodically test restoration.
 
 ## Operations
 
+Check `https://your-domain.example/api/health/readiness` for HTTP 200/`UP` before
+using the company. HTTP 503/`DOWN` includes a database outage; `/healthz` only
+checks static serving and `/api/health` only checks Java liveness. See
+[`READINESS.md`](READINESS.md) for deadlines, PWA display and recovery tests.
+
+Run [`check-company.ps1`](check-company.ps1) with the company ID and its environment
+file for a JSON diagnostic of configuration, isolation, containers and readiness.
+Use `-ConfigurationOnly` before the first start, or include backup/replica paths
+during maintenance. See [`COMPANY_DIAGNOSTICS.md`](COMPANY_DIAGNOSTICS.md).
+
 ```bash
-docker compose --env-file .env --file compose.prod.yml logs --follow gateway backend frontend
-docker compose --env-file .env --file compose.prod.yml restart backend
-docker compose --env-file .env --file compose.prod.yml down
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml logs --follow gateway backend frontend
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml restart backend
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml down
 ```
 
 The final `down` command stops and removes containers and networks but preserves the named database volume.

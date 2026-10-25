@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 import com.invault.inventory.stock.MovementType;
 import com.invault.inventory.stock.dto.StockMovementResponseDTO;
+import com.invault.inventory.batches.dto.BatchResponseDTO;
 
 public record InventoryEventDTO(
         InventoryEventType eventType,
@@ -18,6 +19,26 @@ public record InventoryEventDTO(
         BigDecimal quantity,
         BigDecimal previousBatchQuantity,
         BigDecimal newBatchQuantity) {
+
+    public static InventoryEventDTO batchChanged(BatchResponseDTO batch) {
+        if (batch == null) {
+            throw new IllegalArgumentException("Batch response is required.");
+        }
+
+        return new InventoryEventDTO(
+                InventoryEventType.BATCH_CHANGED,
+                LocalDateTime.now(),
+                null,
+                batch.getProductId(),
+                batch.getProductSku(),
+                batch.getId(),
+                batch.getBatchCode(),
+                null,
+                null,
+                null,
+                batch.getQuantity()
+        );
+    }
 
     public static InventoryEventDTO stockUpdated(StockMovementResponseDTO movement) {
         if (movement == null) {
