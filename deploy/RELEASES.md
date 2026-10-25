@@ -15,6 +15,12 @@ or non-ignored untracked changes. It passes that SHA to both Dockerfiles as
 `invault-backend:<SHA>` and `invault-frontend:<SHA>`. Code images can be reused across
 companies; each company still has its own configuration and database.
 
+Docker builds from a private temporary `git archive` of that commit. Ignored local
+configuration and other untracked files cannot enter the build context. Ordinary
+Docker builds also exclude local/dev configuration via `.dockerignore`. CI creates
+a disposable ignored configuration probe, builds, and inspects the actual packaged
+JAR to verify its absence; an existing local configuration is never overwritten.
+
 Only this invocation's temporary image tags are removed. An existing release tag
 pointing to another image ID is not replaced. A rebuild after cache/base-image
 changes may be rejected; retain the recorded artifacts or create a new committed

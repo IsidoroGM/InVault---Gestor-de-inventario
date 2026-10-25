@@ -100,7 +100,7 @@ jobs:
         id: release
         shell: pwsh
         run: |
-          $release = ./deploy/build-release.ps1 -OutputDirectory "${{ runner.temp }}/invault-release"
+          $release = ./deploy/tests/build-release.ps1 -OutputDirectory "${{ runner.temp }}/invault-release"
           "backend=$($release.BackendImage)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
           "frontend=$($release.FrontendImage)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
           "revision=$($release.Revision)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
