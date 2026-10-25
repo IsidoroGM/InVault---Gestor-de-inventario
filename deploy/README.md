@@ -53,6 +53,11 @@ The host must accept inbound TCP traffic on ports 80 and 443 and UDP traffic on 
 
 ## First deployment
 
+For candidate `v0.1.0-rc.1`, start with the
+[candidate handover](RELEASE_CANDIDATE_ES.md) and [release notes](../CHANGELOG.md).
+The tag identifies application sources; container images are built separately
+with the identified release helper.
+
 1. Install Docker Engine and the Docker Compose plugin on the target host.
 2. Clone the repository and check out the release commit.
 3. Install PowerShell 7.3+ and generate the company's private configuration:
@@ -136,9 +141,9 @@ Use `-ConfigurationOnly` before the first start, or include backup/replica paths
 during maintenance. See [`COMPANY_DIAGNOSTICS.md`](COMPANY_DIAGNOSTICS.md).
 
 ```bash
-docker compose --env-file .env --file compose.prod.yml logs --follow gateway backend frontend
-docker compose --env-file .env --file compose.prod.yml restart backend
-docker compose --env-file .env --file compose.prod.yml down
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml logs --follow gateway backend frontend
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml restart backend
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml down
 ```
 
 The final `down` command stops and removes containers and networks but preserves the named database volume.

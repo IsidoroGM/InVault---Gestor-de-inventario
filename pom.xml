@@ -10,6 +10,7 @@
 	</parent>
 	<groupId>com.invault</groupId>
 	<artifactId>invault-backend</artifactId>
+	<version>0.1.0-rc.1</version>
 	<name>InVault Backend</name>
 	<description>Backend for InVault inventory management application</description>
 	<url/>

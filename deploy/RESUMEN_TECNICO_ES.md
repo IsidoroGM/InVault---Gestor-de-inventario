@@ -4,6 +4,11 @@ Estado de desarrollo: 25 de octubre de 2026. El código se prepara y prueba en u
 rama de GitHub; la puesta en servicio real necesita un servidor y completar la
 aceptación en dispositivos físicos.
 
+La primera candidata se identifica como **0.1.0-rc.1**. El cierre de la fase 1 fija
+su código mediante la etiqueta `v0.1.0-rc.1`, después de las comprobaciones y la
+integración del PR #15. Las [notas de entrega](RELEASE_CANDIDATE_ES.md) explican
+qué incluye, cómo obtenerla y qué falta para ponerla en servicio.
+
 ## 1. Cada empresa conserva su propia información
 
 La PWA es la aplicación que se instala desde el navegador. Se conecta al backend,
@@ -157,7 +162,8 @@ que estaba atendiendo a la empresa. Guía: [RELEASES.md](RELEASES.md).
 2. Configurar DNS/HTTPS y activar las copias periódicas y su supervisión.
 3. Aplicar primero el backend y sus migraciones, y después publicar la PWA.
 4. Hacer una recuperación de ensayo en ese entorno y completar la matriz física.
-5. Revisar e integrar el PR como versión de entrega cuando corresponda.
+5. Completar el piloto y publicar la versión definitiva después de la aceptación
+   de esta candidata. La integración y etiqueta forman parte del cierre de fase 1.
 
 La PWA necesita conexión para consultar datos actuales y registrar cambios. No se
 ha implementado una base independiente en cada dispositivo ni sincronización de

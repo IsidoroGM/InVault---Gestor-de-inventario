@@ -14,6 +14,12 @@ The current user interface is in Spanish. Source code, API contracts, database o
 
 ## Project status
 
+The current release candidate is **0.1.0-rc.1**, identified by the Git tag
+`v0.1.0-rc.1`. See [release notes](CHANGELOG.md) and the
+[candidate handover in Spanish](deploy/RELEASE_CANDIDATE_ES.md) for its scope,
+verification and outstanding acceptance work. Backend and frontend share this
+application version; the Spring Boot parent keeps its own independent version.
+
 The full-stack MVP is implemented. The repository currently includes:
 
 - A production-oriented Spring Boot backend with JWT authentication, four official roles, transactional auditing, Flyway migrations, OpenAPI documentation in development, and authenticated STOMP events.
@@ -447,15 +453,18 @@ The project was built incrementally. The main completed milestones are:
 8. **Operational frontend:** products, catalogues, batches, movements, stock summaries, dashboard, live refresh, user administration, and audit explorer.
 9. **Production delivery:** multi-stage container images, MySQL persistence, Nginx reverse proxy, Caddy HTTPS gateway, health checks, security restrictions, deployment documentation, and CI validation.
 10. **PWA and tablet readiness:** install manifest and icons, service worker updates, responsive/touch behavior, offline mutation blocking, device acceptance checklist, and disposable HTTPS preview workflow.
+11. **Company isolation and recovery:** independent company configuration, real-MySQL isolation checks, encrypted backups, isolated recovery and backup supervision.
+12. **Inventory and access integrity:** persistent movement idempotency, login budgets and measurement identity, including Flyway V4-V6 and concurrent MySQL verification.
+13. **Operational readiness and release identity:** database-aware health checks, company diagnostics, source-only image builds and deployed-image revision in backup metadata.
 
 ## Current boundaries and future work
 
 The following items are not part of the current implementation or remain recommended hardening work:
 
 - Complete deployment acceptance with independent MySQL volumes, container/database restart and backup restoration; automated real-MySQL integration checks already cover migrations, concurrency, rollback, company isolation and application restart.
-- Add login rate limiting, abuse monitoring, and operational alerting.
+- Connect the existing login-throttling audit and company/backup diagnostics to operational alerts on the target hosts. Persistent login rate limiting is already implemented.
 - Add metrics, distributed tracing, richer structured logs, and correlation IDs.
-- Add coverage thresholds, backend/image dependency scanning, and static application security testing. Frontend CI already audits npm dependencies.
+- Add full browser-flow tests, load tests, coverage thresholds, backend/image dependency scanning, and static application security testing. Frontend CI already audits npm dependencies.
 - Replace the in-memory STOMP broker before horizontally scaling the backend.
 - Introduce per-device sessions if global user token revocation is too coarse for future requirements.
 - Activate per-company backup timers, external replicas and recovery acceptance on the production hosts; encrypted backup and isolated restoration scripts are already verified in CI.
