@@ -22,6 +22,11 @@ La pérdida de respuesta se provoca después de enviar la petición real al back
 Se comprueba después la cantidad y el número de movimientos guardados. Las pruebas
 de reconexión esperan a STOMP y comprueban el valor mostrado sin recargar la página.
 
+Estos ensayos detectaron y motivaron dos correcciones: abrir una conexión nueva al
+recuperar Internet aunque el navegador conserve el WebSocket anterior, y permitir
+que las pulsaciones atraviesen las etiquetas decorativas sobre selectores en WebKit.
+Las pruebas utilizan la interacción normal, sin forzar clics sobre elementos tapados.
+
 Los perfiles móviles son emulación. La instalación física, certificados públicos y
 actualización del service worker siguen en [PWA_ACCEPTANCE.md](PWA_ACCEPTANCE.md).
 El service worker se bloquea en este conjunto para controlar la inyección del fallo
@@ -76,6 +81,12 @@ Referencia: [CSRF y credenciales del navegador](https://docs.spring.io/spring-se
 Un resultado correcto se refiere al código, imágenes, reglas y base de
 vulnerabilidades utilizados en esa ejecución. Se deben revisar los informes
 completos, incluidos los hallazgos no bloqueantes y los que aún no tienen arreglo.
+
+El primer análisis de imágenes detectó correcciones pendientes en OpenSSL,
+Jackson, Tomcat, Spring MVC y paquetes de Alpine. Se actualiza la plataforma a
+Spring Boot 4.1.2 y las bases oficiales de Java/nginx/Node, con actualizaciones de
+paquetes del sistema al construir. El informe de cada nueva imagen determina si
+las correcciones son suficientes; no se aprueba una imagen por cambiar su etiqueta.
 
 ## Ejecución y evidencia
 

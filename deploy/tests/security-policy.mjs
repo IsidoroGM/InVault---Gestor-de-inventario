@@ -86,6 +86,7 @@ export function assessSarif(report, reviews = [], fingerprints = {}) {
     findings: findings.length,
     blocking,
     reviewed,
+    reported: findings,
   };
 }
 if (
@@ -134,6 +135,7 @@ if (
             findings: reports.reduce((sum, report) => sum + report.findings, 0),
             blocking: reports.flatMap((report) => report.blocking),
             reviewed: reports.flatMap((report) => report.reviewed),
+            reported: reports.flatMap((report) => report.reported),
           };
         })()
       : assess(

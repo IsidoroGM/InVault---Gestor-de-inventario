@@ -11,12 +11,13 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn --batch-mode --no-transfer-progress clean package -DskipTests
 
-FROM eclipse-temurin:25.0.2_10-jre
+FROM eclipse-temurin:25.0.4.1_1-jre-noble
 
 ARG INVAULT_BUILD_REVISION=unversioned
 LABEL org.opencontainers.image.revision="$INVAULT_BUILD_REVISION"
 
 RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
     && apt-get install --yes --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system invault \
