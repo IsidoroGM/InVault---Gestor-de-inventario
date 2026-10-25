@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
 
 export function assess(report, kind) {
   assert.ok(["backend", "frontend"].includes(kind));
@@ -39,7 +40,7 @@ export function assess(report, kind) {
     ).length,
   };
 }
-export function assessSarif(report) {
+export function assessSarif(report, reviews = [], fingerprints = {}) {
   assert.equal(report.version, "2.1.0", "Unsupported SAST report");
   assert.ok(report.runs?.length > 0, "No SAST analysis was recorded");
   const findings = report.runs.flatMap((run) =>
@@ -60,9 +61,31 @@ export function assessSarif(report) {
       };
     }),
   );
+  const reviewed = [];
+  const blocking = findings
+    .filter((finding) => finding.score >= 7)
+    .filter((finding) => {
+      const review = reviews.find(
+        (entry) =>
+          entry.rule === finding.rule &&
+          entry.file === finding.file &&
+          typeof entry.reason === "string" &&
+          entry.reason.length >= 30 &&
+          /^[a-f0-9]{64}$/.test(entry.sha256) &&
+          fingerprints[entry.file] === entry.sha256,
+      );
+      if (!review) return true;
+      reviewed.push({
+        ...finding,
+        reason: review.reason,
+        sourceSha256: review.sha256,
+      });
+      return false;
+    });
   return {
     findings: findings.length,
-    blocking: findings.filter((finding) => finding.score >= 7),
+    blocking,
+    reviewed,
   };
 }
 if (
@@ -76,15 +99,41 @@ if (
             file.endsWith(".sarif"),
           );
           assert.ok(files.length > 0, "No SAST report was produced");
+          const reviews = JSON.parse(
+            readFileSync(
+              new URL("../codeql-reviewed-findings.json", import.meta.url),
+              "utf8",
+            ),
+          ).findings;
+          const fingerprints = Object.fromEntries(
+            reviews.map((entry) => {
+              assert.ok(
+                entry.file.startsWith("src/") &&
+                  !entry.file.split("/").includes(".."),
+                "Invalid reviewed source path",
+              );
+              const source = readFileSync(
+                new URL("../../" + entry.file, import.meta.url),
+                "utf8",
+              ).replaceAll("\r\n", "\n");
+              return [
+                entry.file,
+                createHash("sha256").update(source).digest("hex"),
+              ];
+            }),
+          );
           const reports = files.map((file) =>
             assessSarif(
               JSON.parse(readFileSync(join(process.argv[2], file), "utf8")),
+              reviews,
+              fingerprints,
             ),
           );
           return {
             reports: reports.length,
             findings: reports.reduce((sum, report) => sum + report.findings, 0),
             blocking: reports.flatMap((report) => report.blocking),
+            reviewed: reports.flatMap((report) => report.reviewed),
           };
         })()
       : assess(

@@ -121,3 +121,48 @@ test("CodeQL query-pack extension metadata preserves security scores", () => {
   });
   assert.equal(result.blocking.length, 1);
 });
+const reviewedFile =
+  "src/main/java/com/invault/inventory/config/SecurityConfig.java";
+const reviewedReport = {
+  version: "2.1.0",
+  runs: [
+    {
+      tool: {
+        driver: {
+          rules: [
+            { id: "reviewed", properties: { "security-severity": "8.8" } },
+          ],
+        },
+      },
+      results: [
+        {
+          ruleId: "reviewed",
+          locations: [
+            { physicalLocation: { artifactLocation: { uri: reviewedFile } } },
+          ],
+        },
+      ],
+    },
+  ],
+};
+const review = {
+  rule: "reviewed",
+  file: reviewedFile,
+  sha256: "a".repeat(64),
+  reason:
+    "Documented authentication design verified by explicit browser-credential regression tests.",
+};
+test("a reviewed finding requires the exact source fingerprint", () => {
+  const result = assessSarif(reviewedReport, [review], {
+    [reviewedFile]: review.sha256,
+  });
+  assert.equal(result.blocking.length, 0);
+  assert.equal(result.reviewed.length, 1);
+});
+test("editing a reviewed file restores the security blocker", () => {
+  const result = assessSarif(reviewedReport, [review], {
+    [reviewedFile]: "b".repeat(64),
+  });
+  assert.equal(result.blocking.length, 1);
+  assert.equal(result.reviewed.length, 0);
+});

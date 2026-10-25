@@ -11,6 +11,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: 0,
+  maxFailures: 3,
   timeout: 60000,
   expect: { timeout: 12000 },
   forbidOnly: !!process.env.CI,
@@ -18,6 +19,8 @@ export default defineConfig({
   reporter: [['list'], ['junit', { outputFile: join(reports, 'browser-junit.xml') }]],
   use: {
     baseURL,
+    actionTimeout: 10000,
+    navigationTimeout: 20000,
     serviceWorkers: 'block',
     trace: 'off',
     video: 'off',

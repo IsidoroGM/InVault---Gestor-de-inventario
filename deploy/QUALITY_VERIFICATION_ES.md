@@ -61,8 +61,17 @@ un análisis vacío o un formato desconocido no puede dar la imagen por aprobada
 
 El frontend también conserva la auditoría npm de las dependencias bloqueadas. Las
 acciones nuevas de seguridad y conservación de informes se fijan por SHA. No se
-añaden listas de exclusión de vulnerabilidades. Los diez casos de la política
+añaden exclusiones de vulnerabilidades de dependencias o imágenes. Los doce casos de la política
 comprueban rechazos y umbrales con informes de prueba.
+
+El aviso CodeQL sobre CSRF desactivado tiene una revisión de diseño específica en
+codeql-reviewed-findings.json. La API exige JWT explícitos y no autentica cookies,
+sesiones, formularios ni HTTP Basic. Dos pruebas de la cadena real rechazan
+credenciales ambientales, login de otro origen y formularios. La revisión solo se
+aplica a esa regla y a la huella SHA-256 del archivo SecurityConfig.java revisado;
+si cambia el archivo, el hallazgo vuelve a bloquear. El informe conserva el aviso
+y su justificación. Añadir autenticación mediante cookies exige rediseñar CSRF.
+Referencia: [CSRF y credenciales del navegador](https://docs.spring.io/spring-security/reference/features/exploits/csrf.html).
 
 Un resultado correcto se refiere al código, imágenes, reglas y base de
 vulnerabilidades utilizados en esa ejecución. Se deben revisar los informes

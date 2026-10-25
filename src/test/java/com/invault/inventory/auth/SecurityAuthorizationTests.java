@@ -17,6 +17,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.util.List;
 
+import jakarta.servlet.http.Cookie;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.mock.web.MockHttpSession;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +66,9 @@ class SecurityAuthorizationTests {
 
     @Autowired
     private JwtEncoder jwtEncoder;
+
+    @Autowired
+    private FilterChainProxy securityFilters;
 
     @MockitoBean
     private AuthService authService;
@@ -303,6 +315,39 @@ class SecurityAuthorizationTests {
                 .andExpect(status().isNoContent());
 
         verify(authService).logout(99L);
+    }
+
+    @Test
+    void ambientBrowserCredentialsCannotAuthorizeApiMutations() throws Exception {
+        String signedToken = bearerToken("ADMIN").substring("Bearer ".length());
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                "ambient-admin", null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+        MockHttpSession ambientSession = new MockHttpSession();
+        ambientSession.setAttribute("SPRING_SECURITY_CONTEXT", context);
+        mockMvc.perform(post("/api/categories").session(ambientSession)
+                        .cookie(new Cookie("JSESSIONID", ambientSession.getId()),
+                                new Cookie("access_token", signedToken),
+                                new Cookie("Authorization", "Bearer " + signedToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Ambient credentials must not write\"}"))
+                .andExpect(status().isUnauthorized());
+        org.assertj.core.api.Assertions.assertThat(securityFilters.getFilters("/api/categories"))
+                .noneMatch(filter -> filter instanceof BasicAuthenticationFilter
+                        || filter instanceof UsernamePasswordAuthenticationFilter);
+        verifyNoInteractions(categoryService);
+    }
+
+    @Test
+    void crossOriginAndFormLoginCannotEstablishBrowserCredentials() throws Exception {
+        mockMvc.perform(post("/api/auth/login").header("Origin", "https://untrusted.example.test")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin\",\"password\":\"synthetic-password\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .content("username=admin&password=synthetic-password"))
+                .andExpect(status().isUnsupportedMediaType());
+        verifyNoInteractions(authService);
     }
 
     private String bearerToken(String role) {

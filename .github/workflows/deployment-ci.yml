@@ -136,6 +136,8 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
 
       - name: Verify browser flows and bounded concurrent workload
+        id: browser_load
+        continue-on-error: true
         shell: pwsh
         run: >-
           ./deploy/tests/quality-stack.ps1
@@ -171,3 +173,7 @@ jobs:
           path: ${{ runner.temp }}/invault-quality-report
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Require successful browser and load verification
+        if: always() && steps.browser_load.outcome != 'success'
+        run: exit 1

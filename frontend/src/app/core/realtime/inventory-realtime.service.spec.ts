@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 import { AuthSessionStore } from '../auth/auth-session.store';
 import { AuthSession } from '../auth/auth.models';
 import { API_CONFIGURATION } from '../configuration/api-configuration';
+import { NetworkStatusService } from '../pwa/network-status.service';
 import { InventoryRealtimeService } from './inventory-realtime.service';
 
 interface ClientOptions {
@@ -45,6 +46,7 @@ vi.mock('@stomp/stompjs', () => ({
 
 describe('InventoryRealtimeService', () => {
   const session = signal<AuthSession | null>(null);
+  const offline = signal(false);
   const login = (): AuthSession => ({
     accessToken: 'token-a',
     tokenType: 'Bearer',
@@ -58,9 +60,11 @@ describe('InventoryRealtimeService', () => {
 
   beforeEach(() => {
     stomp.clients.length = 0;
+    offline.set(false);
     session.set(login());
     TestBed.configureTestingModule({
       providers: [
+        { provide: NetworkStatusService, useValue: { online: () => !offline(), offline } },
         {
           provide: AuthSessionStore,
           useValue: { session, hasValidSession: () => session() !== null },
@@ -98,6 +102,25 @@ describe('InventoryRealtimeService', () => {
     client.options.onConnect();
     expect(service.refreshVersion()).toBe(2);
     expect(service.lastEvent()).toBeNull();
+  });
+
+  it('replaces a seemingly connected socket after an offline interval', () => {
+    const service = start();
+    const stale = stomp.clients[0];
+    stale.options.onConnect();
+    offline.set(true);
+    TestBed.tick();
+    expect(stale.deactivate).toHaveBeenCalled();
+    expect(service.state()).toBe('disconnected');
+    stale.options.onConnect();
+    expect(service.refreshVersion()).toBe(1);
+    offline.set(false);
+    TestBed.tick();
+    const current = stomp.clients[1];
+    expect(current.activate).toHaveBeenCalled();
+    current.options.onConnect();
+    expect(service.refreshVersion()).toBe(2);
+    expect(service.state()).toBe('connected');
   });
 
   it('invalidates inventory for batch changes that have no movement identifier', () => {

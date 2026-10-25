@@ -13,6 +13,30 @@ let token;
 test.beforeEach(async () => {
   token = (await login()).accessToken;
 });
+test.afterEach(async ({ page }, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    console.log(
+      'Disposable UI failure context:',
+      JSON.stringify({
+        path: new URL(page.url()).pathname,
+        headings: await page
+          .getByRole('heading')
+          .allTextContents()
+          .catch(() => []),
+        alerts: await page
+          .getByRole('alert')
+          .allTextContents()
+          .catch(() => []),
+        dialog: (
+          await page
+            .getByRole('dialog')
+            .allTextContents()
+            .catch(() => [])
+        ).map((text) => text.slice(0, 2500)),
+      }),
+    );
+  }
+});
 
 async function signIn(page, username = 'admin', password = settings().password) {
   await page.goto('/login');
@@ -42,6 +66,7 @@ async function prepareMovement(page, fixture, quantity, type = 'Entrada') {
 async function confirmMovement(page, dialog) {
   const response = page.waitForResponse(
     (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/stock/movements',
+    { timeout: 15000 },
   );
   await dialog.getByRole('button', { name: /^(Registrar movimiento|Reintentar envío)$/ }).click();
   expect((await response).status()).toBe(201);
@@ -92,7 +117,9 @@ test('product and batch forms lead to auditable inbound and outbound balances', 
   const product = (await api('/api/products/active', { token })).find((p) => p.sku === sku);
   expect(product).toBeTruthy();
   await page.getByLabel('Buscar productos', { exact: true }).fill(sku);
-  await expect(page.getByText(sku, { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText(sku, { exact: true }).filter({ visible: true }).first(),
+  ).toBeVisible();
   await visit(page, '/batches');
   await page.getByRole('button', { name: 'Nuevo lote', exact: true }).click();
   dialog = page.getByRole('dialog');
@@ -239,7 +266,7 @@ test('offline submission never changes stock or replays automatically after reco
   await context.setOffline(true);
   await expect(page.getByText('Estás trabajando sin conexión', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Registrar movimiento', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toContainText(/conexión/i);
+  await expect(dialog.getByRole('alert')).toContainText('Conéctate a Internet');
   expect(await quantity(fixture)).toBe(0);
   await context.setOffline(false);
   await expect(page.getByText('Estás trabajando sin conexión', { exact: true })).toBeHidden();
