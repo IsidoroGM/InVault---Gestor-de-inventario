@@ -11,3 +11,4 @@ compose*.yml
 backups
 *.age
 *.agekey
+releases

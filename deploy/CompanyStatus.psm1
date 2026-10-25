@@ -74,8 +74,10 @@ function Get-InVaultCompanyConfigurationStatus {
 function Get-InVaultCompanyRuntimeStatus {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$CompanyId, [Parameter(Mandatory)][Collections.IDictionary]$Model,
-        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Containers)
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Containers,
+        [string]$ExpectedRevision)
     Assert-CompanyId $CompanyId
+    if ($ExpectedRevision -and $ExpectedRevision -cnotmatch '^[a-f0-9]{40}$') { throw 'ExpectedRevision must be a full lowercase Git commit SHA.' }
     $project = "invault-$CompanyId"
     $checks = [Collections.Generic.List[object]]::new()
     $services = [Collections.Generic.List[object]]::new()
@@ -119,9 +121,11 @@ function Get-InVaultCompanyRuntimeStatus {
             $checks.Add(@{code="$service`_configuration_matches"; ok=$matches})
         }
         $imageId = Read-CompanyValue $container @('Image')
-        $services.Add(@{service=$service; running=$running; healthy=$healthy; imageId=$(if ($imageId -cmatch '^sha256:[a-f0-9]{64}$') {$imageId} else {$null})})
+        $revision = Read-CompanyValue $container @('Config','Labels','org.opencontainers.image.revision')
+        if ($ExpectedRevision -and $service -in @('backend','frontend')) { $checks.Add(@{code="$service`_expected_revision";ok=($revision -ceq $ExpectedRevision)}) }
+        $services.Add(@{service=$service; running=$running; healthy=$healthy; imageId=$(if ($imageId -cmatch '^sha256:[a-f0-9]{64}$') {$imageId} else {$null}); revision=$(if ($revision -cmatch '^[a-f0-9]{40}$') {$revision} else {$null})})
     }
-    [PSCustomObject]@{healthy=(@($checks | Where-Object {-not $_.ok}).Count -eq 0); services=$services; checks=$checks}
+    [PSCustomObject]@{healthy=(@($checks | Where-Object {-not $_.ok}).Count -eq 0); revisionChecked=(-not [string]::IsNullOrEmpty($ExpectedRevision)); services=$services; checks=$checks}
 }
 
 Export-ModuleMember -Function Get-InVaultCompanyConfigurationStatus, Get-InVaultCompanyRuntimeStatus

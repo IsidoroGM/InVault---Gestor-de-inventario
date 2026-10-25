@@ -137,6 +137,20 @@ No inicia servicios ni modifica existencias y su informe omite claves y contrase
 DNS, certificados y pruebas de dispositivos siguen requiriendo aceptación aparte.
 Guía: [COMPANY_DIAGNOSTICS.md](COMPANY_DIAGNOSTICS.md).
 
+## 10. Preparar una versión identificable para cada instalación
+
+El nuevo constructor toma un commit confirmado y una carpeta sin cambios pendientes.
+Construye las imágenes de Java y la PWA, y les añade ese identificador. Guarda un
+descriptor con sus huellas y un archivo Compose que selecciona esa versión.
+Las empresas pueden utilizar el mismo código con bases y configuraciones propias.
+
+El diagnóstico puede comprobar que Java y la PWA ejecutan la revisión esperada.
+Las copias obtienen ahora la revisión de la imagen desplegada, aunque se haya
+descargado código más nuevo en la carpeta. Para instalaciones antiguas sin esa
+marca hay que indicar su versión comprobada; una versión que contradiga la imagen
+se rechaza. Así, la recuperación conserva una referencia fiel de la aplicación
+que estaba atendiendo a la empresa. Guía: [RELEASES.md](RELEASES.md).
+
 ## Lo que queda para una puesta en marcha real
 
 1. Fijar el servidor, dominio y almacenamiento externo de copias para cada empresa.

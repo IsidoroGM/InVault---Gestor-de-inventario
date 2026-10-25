@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory)][string]$CompanyId,
     [Parameter(Mandatory)][string]$EnvironmentFile,
     [switch]$ConfigurationOnly,
+    [ValidatePattern('^[a-f0-9]{40}$')][string]$ExpectedRevision,
     [string]$BackupDirectory,
     [string]$ReplicaDirectory,
     [ValidateRange(1,8760)][double]$MaxBackupAgeHours = 30
@@ -34,7 +35,7 @@ try {
                 foreach ($container in $decoded) { $containers.Add($container) }
             }
         }
-        $runtime = Get-InVaultCompanyRuntimeStatus -CompanyId $CompanyId -Model $model -Containers $containers.ToArray()
+        $runtime = Get-InVaultCompanyRuntimeStatus -CompanyId $CompanyId -Model $model -Containers $containers.ToArray() -ExpectedRevision $ExpectedRevision
         $report.runtimeChecked = $true; $report.runtime = $runtime
         $report.healthy = $report.healthy -and $runtime.healthy
         if ($runtime.healthy) {

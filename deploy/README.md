@@ -55,23 +55,26 @@ The host must accept inbound TCP traffic on ports 80 and 443 and UDP traffic on 
 
 1. Install Docker Engine and the Docker Compose plugin on the target host.
 2. Clone the repository and check out the release commit.
-3. Copy `.env.production.example` to `.env`, set `APP_DOMAIN` and `APP_PUBLIC_URL` to the same public HTTPS origin, replace every example credential, and restrict it to the deployment account with `chmod 600 .env`.
-4. Generate the JWT secret from at least 32 random bytes:
+3. Install PowerShell 7.3+ and generate the company's private configuration:
 
-   ```bash
-   openssl rand -base64 32
+   ```powershell
+   $company = ./deploy/new-company.ps1 -CompanyId company-a -Domain inventory.example.com -AdminEmail admin@inventory.example.com
    ```
 
-5. Keep `INVAULT_BOOTSTRAP_ADMIN_ENABLED=true` only for the initial start. The bootstrap password is temporary and the administrator must replace it at first login.
-6. Validate and start the stack:
+4. Build an identified release from the clean committed checkout. See [RELEASES.md](RELEASES.md).
 
-   ```bash
-   docker compose --env-file .env --file compose.prod.yml config --quiet
-   docker compose --env-file .env --file compose.prod.yml up --detach --build
-   docker compose --env-file .env --file compose.prod.yml ps
+   ```powershell
+   $release = ./deploy/build-release.ps1
+   ./deploy/check-company.ps1 -CompanyId company-a -EnvironmentFile $company.EnvironmentFile -ConfigurationOnly
+   docker compose --project-name $company.ProjectName --env-file $company.EnvironmentFile --file compose.prod.yml --file $release.ComposeFile up --detach --no-build --wait
+   ./deploy/check-company.ps1 -CompanyId company-a -EnvironmentFile $company.EnvironmentFile -ExpectedRevision $release.Revision
    ```
 
-7. Confirm `https://your-domain.example/healthz`, sign in, install the PWA from the browser, change the bootstrap password, then set `INVAULT_BOOTSTRAP_ADMIN_ENABLED=false`, clear the three bootstrap identity/credential values and run the `up --detach` command again.
+5. Keep bootstrap enabled only for the initial start. Read its temporary password
+   from the protected configuration and replace it at first login.
+6. Verify public HTTPS and install the PWA. Disable and clear bootstrap settings,
+   then repeat `up` with the same project, environment file and release overlay.
+   Configure the company's backups and monitoring.
 
 ## PWA installation and updates
 
@@ -104,8 +107,9 @@ for configuration and the distinction between freshness checks and recovery test
 
 ## Updates
 
-Back up the company database, fetch the desired release, then rebuild that same
-company project. Flyway applies pending migrations before the backend becomes healthy.
+Build and record the desired release images, back up the running company database,
+then use the release overlay with `up --no-build --wait` for that same project.
+Flyway applies pending migrations before the backend becomes healthy.
 Using a [generated company configuration](COMPANY_DEPLOYMENTS.md):
 
 ```bash
@@ -113,7 +117,7 @@ pwsh -NoProfile -NonInteractive -File ./deploy/backup-company.ps1 \
   -CompanyId company-a -EnvironmentFile .env.company-company-a \
   -RecipientFile /etc/invault/backup-recipients.txt \
   -OutputDirectory /var/backups/invault/company-a
-docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml up --detach --build
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml --file releases/invault-RELEASE_SHA.compose.json up --detach --no-build --wait
 docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml ps
 ```
 

@@ -47,3 +47,4 @@ compose.override.yml
 *.age
 *.age.part
 *.agekey
+/releases/

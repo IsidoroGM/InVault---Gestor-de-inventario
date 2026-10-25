@@ -13,6 +13,9 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 FROM eclipse-temurin:25.0.2_10-jre
 
+ARG INVAULT_BUILD_REVISION=unversioned
+LABEL org.opencontainers.image.revision="$INVAULT_BUILD_REVISION"
+
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \

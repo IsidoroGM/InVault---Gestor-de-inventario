@@ -13,6 +13,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 Import-Module (Join-Path $PSScriptRoot 'Backup.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'ReleaseIdentity.psm1') -Force
 Assert-BackupCompany $CompanyId
 $repository = Split-Path $PSScriptRoot -Parent
 $project = "invault-$CompanyId"
@@ -31,7 +32,16 @@ if ($inspection.Config.Labels.'com.docker.compose.project' -cne $project -or
     $inspection.Config.Env -cnotcontains "MYSQL_DATABASE=$database" -or -not $inspection.State.Running) {
     throw 'The database container identity does not match the requested company.'
 }
-if (-not $ReleaseCommit) { $ReleaseCommit = (Invoke-BackupCommand @{File='git'; Arguments=@('-C', $repository, 'rev-parse', 'HEAD')}).Trim() }
+$recordedRevision = $null
+$backend = (Invoke-BackupCommand @{File=$DockerExecutable; Arguments=($composeArguments + @('--project-name',$project,'ps','--all','--quiet','backend'))}).Trim()
+if ($backend) {
+    if ($backend -cnotmatch '^[a-f0-9]{12,64}$') { throw 'Expected at most one company backend container.' }
+    $backendRecords = @(Invoke-BackupCommand @{File=$DockerExecutable; Arguments=@('inspect',$backend)} | ConvertFrom-Json -AsHashtable)
+    $backendMetadata = $backendRecords[0]
+    if ($backendMetadata.Config.Labels['com.docker.compose.project'] -cne $project -or $backendMetadata.Config.Labels['com.docker.compose.service'] -cne 'backend') { throw 'The backend container does not belong to the requested company.' }
+    if ($backendMetadata.Config.Labels.Contains('org.opencontainers.image.revision')) { $recordedRevision = $backendMetadata.Config.Labels['org.opencontainers.image.revision'] }
+}
+$ReleaseCommit = Resolve-InVaultReleaseCommit -RecordedRevision $recordedRevision -ExplicitRevision $ReleaseCommit
 $dump = 'MYSQL_PWD="$MYSQL_PASSWORD" exec mysqldump --user="$MYSQL_USER" --single-transaction --quick --skip-lock-tables --no-tablespaces --set-gtid-purged=OFF --hex-blob --default-character-set=utf8mb4 --skip-add-drop-table "$MYSQL_DATABASE"'
 $result = New-InVaultEncryptedBackup -CompanyId $CompanyId -ProjectName $project -DatabaseName $database `
     -ReleaseCommit $ReleaseCommit -DumpCommand @{File=$DockerExecutable; Arguments=@('exec', $container, 'sh', '-c', $dump)} `

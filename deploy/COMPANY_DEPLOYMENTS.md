@@ -44,13 +44,18 @@ The project name identifies the existing volumes and must remain stable:
 
 ~~~bash
 docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml config --quiet
-docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml up --detach --build
+docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml --file releases/invault-RELEASE_SHA.compose.json up --detach --no-build --wait
 docker compose --project-name invault-company-a --env-file .env.company-company-a --file compose.prod.yml ps
 ~~~
 
 Repeat with a different CompanyId, domain, environment file and project name for
 each company. Do not copy another company's generated secrets or database volume.
 Flyway creates and upgrades each company's schema independently.
+
+Build the images once with [build-release.ps1](RELEASES.md) from a clean committed
+checkout and replace `RELEASE_SHA` with its full revision. Keep the release overlay
+on every `up`, including bootstrap cleanup, so a maintenance command cannot rebuild
+another version. Other read-only operations and shutdown can use the base file.
 
 Complete the first-login password change, set INVAULT_BOOTSTRAP_ADMIN_ENABLED=false,
 clear the bootstrap username/email/password in that company's environment file,

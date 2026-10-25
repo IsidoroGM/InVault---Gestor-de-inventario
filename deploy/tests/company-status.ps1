@@ -92,4 +92,13 @@ $serialized=@((Read-ConfigReport $model),(Runtime $model @(New-Containers $model
 Assert-True (-not $serialized.Contains($fixturePassword) -and -not $serialized.Contains($fixtureJwt)) 'Diagnostics exposed a database or JWT secret.'
 $model.services.backend.environment.INVAULT_CORS_ALLOWED_ORIGINS='https://user:private@a.example.test'
 Assert-True (-not ((Read-ConfigReport $model) | ConvertTo-Json -Depth 10).Contains('user:private')) 'An invalid URL exposed embedded credentials.'
+$model=New-Model
+$containers=@(New-Containers $model)
+$revision='a'*40
+foreach ($container in $containers) { $container.Config.Labels['org.opencontainers.image.revision']=$revision }
+Assert-True (Get-InVaultCompanyRuntimeStatus -CompanyId check-a -Model $model -Containers $containers -ExpectedRevision $revision).healthy 'Matching image revisions were rejected.'
+$containers[2].Config.Labels['org.opencontainers.image.revision']='b'*40
+Assert-True (-not (Get-InVaultCompanyRuntimeStatus -CompanyId check-a -Model $model -Containers $containers -ExpectedRevision $revision).healthy) 'A different frontend release was accepted.'
+$containers[2].Config.Labels.Remove('org.opencontainers.image.revision')
+Assert-True (-not (Get-InVaultCompanyRuntimeStatus -CompanyId check-a -Model $model -Containers $containers -ExpectedRevision $revision).healthy) 'An unidentified frontend release was accepted.'
 Write-Host "Company diagnostics passed: $cases checks for configuration, runtime, isolation, stale settings and secret-free output."

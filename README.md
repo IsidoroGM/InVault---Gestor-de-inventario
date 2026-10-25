@@ -356,13 +356,14 @@ The supported Compose deployment targets a single Linux host with Docker Engine 
 
 Before deploying, point the domain to the host and allow inbound TCP `80/443` and UDP `443`.
 
-```bash
-cp .env.production.example .env
-# Replace every example domain, password, and secret in .env.
+With PowerShell 7.3+, build from a clean committed checkout:
 
-docker compose --env-file .env --file compose.prod.yml config --quiet
-docker compose --env-file .env --file compose.prod.yml up --detach --build
-docker compose --env-file .env --file compose.prod.yml ps
+```powershell
+$company = ./deploy/new-company.ps1 -CompanyId company-a -Domain inventory.example.com -AdminEmail admin@inventory.example.com
+$release = ./deploy/build-release.ps1
+./deploy/check-company.ps1 -CompanyId company-a -EnvironmentFile $company.EnvironmentFile -ConfigurationOnly
+docker compose --project-name $company.ProjectName --env-file $company.EnvironmentFile --file compose.prod.yml --file $release.ComposeFile up --detach --no-build --wait
+./deploy/check-company.ps1 -CompanyId company-a -EnvironmentFile $company.EnvironmentFile -ExpectedRevision $release.Revision
 ```
 
 Keep bootstrap administration enabled only for the first deployment. Change the temporary password, disable the bootstrap flag, clear its credential values, and recreate the backend service.
@@ -370,6 +371,11 @@ Keep bootstrap administration enabled only for the first deployment. Change the 
 Do not run `docker compose down --volumes` in production: that removes the MySQL volume. Back up the database before updates and store encrypted copies away from the host. [Company backup and recovery scripts](deploy/BACKUPS.md) include encryption, an isolated restore and systemd scheduling templates.
 
 See [deploy/README.md](deploy/README.md) for the complete first-deployment, update, backup, and operations procedure.
+
+[Identified releases](deploy/RELEASES.md) record the actual image revision and IDs.
+The [company diagnostic](deploy/COMPANY_DIAGNOSTICS.md) checks configuration,
+runtime isolation and database readiness; public DNS/TLS and device acceptance
+remain separate checks.
 
 For distribution to several companies, use [independent company deployments](deploy/COMPANY_DEPLOYMENTS.md).
 Each company has its own database, persistent volume, application services, credentials, JWT key and HTTPS origin.

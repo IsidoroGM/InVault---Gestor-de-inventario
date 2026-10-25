@@ -1,6 +1,11 @@
 #requires -Version 7.3
 [CmdletBinding()]
-param()
+param(
+    [ValidatePattern('^invault-backend:(?:latest|[a-f0-9]{40})$')][string]$BackendImage='invault-backend:latest',
+    [ValidatePattern('^invault-frontend:(?:latest|[a-f0-9]{40})$')][string]$FrontendImage='invault-frontend:latest',
+    [ValidatePattern('^[a-f0-9]{40}$')][string]$ExpectedRevision,
+    [string]$AgeDirectory
+)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -50,23 +55,24 @@ try {
     $override = Join-Path $testRoot 'login.compose.yml'
     # Use the exact images built in Deployment CI. The original production Caddy/nginx files
     # still route every request; an explicit HTTP site avoids public DNS/ACME for this local test.
-    [IO.File]::WriteAllText($override, @'
+    $overrideSource = @'
 services:
   backend:
-    image: invault-backend:latest
+    image: __BACKEND_IMAGE__
     environment:
       INVAULT_LOGIN_ACCOUNT_ATTEMPTS: "2"
       INVAULT_LOGIN_IP_ATTEMPTS: "4"
       INVAULT_LOGIN_WINDOW: "5m"
       DB_CONNECTION_TIMEOUT_MS: "1000"
   frontend:
-    image: invault-frontend:latest
+    image: __FRONTEND_IMAGE__
   gateway:
     environment:
       APP_DOMAIN: http://localhost
     ports: !override
       - "127.0.0.1::80"
-'@)
+'@
+    [IO.File]::WriteAllText($override,$overrideSource.Replace('__BACKEND_IMAGE__',$BackendImage).Replace('__FRONTEND_IMAGE__',$FrontendImage))
     $compose = @('compose', '--project-name', $project, '--env-file', $company.EnvironmentFile,
         '--file', (Join-Path $repository 'compose.prod.yml'), '--file', $override)
     $ownsProject = $true
@@ -77,7 +83,8 @@ services:
     Wait-Api
     $diagnostics = Join-Path $repository 'deploy/check-company.ps1'
     $shell = (Get-Process -Id $PID).Path
-    $statusJson = & $shell -NoProfile -NonInteractive -File $diagnostics -CompanyId "login-$testId" -EnvironmentFile $company.EnvironmentFile
+    $revisionArguments = if ($ExpectedRevision) {@('-ExpectedRevision',$ExpectedRevision)} else {@()}
+    $statusJson = & $shell -NoProfile -NonInteractive -File $diagnostics -CompanyId "login-$testId" -EnvironmentFile $company.EnvironmentFile @revisionArguments
     Assert-True ($LASTEXITCODE -eq 0) 'The company diagnostic rejected healthy production containers.'
     $companyStatus = ($statusJson -join "`n") | ConvertFrom-Json
     Assert-True ($companyStatus.healthy -and $companyStatus.readinessAvailable) 'The runtime diagnostic did not confirm readiness.'
@@ -106,7 +113,7 @@ services:
     Assert-True ($down.StatusCode -eq 503 -and ($down.Content | ConvertFrom-Json).status -eq 'DOWN') 'Readiness stayed available after stopping MySQL.'
     Assert-True (@(($down.Content | ConvertFrom-Json).PSObject.Properties).Count -eq 1) 'Public readiness exposed internal details.'
     Assert-True ((Invoke-WebRequest -Uri "$script:baseUrl/api/health" -Headers @{Host='localhost'} -TimeoutSec 5).StatusCode -eq 200) 'Database failure incorrectly stopped Java liveness.'
-    $downJson = & $shell -NoProfile -NonInteractive -File $diagnostics -CompanyId "login-$testId" -EnvironmentFile $company.EnvironmentFile
+    $downJson = & $shell -NoProfile -NonInteractive -File $diagnostics -CompanyId "login-$testId" -EnvironmentFile $company.EnvironmentFile @revisionArguments
     Assert-True ($LASTEXITCODE -eq 2 -and -not (($downJson -join "`n") | ConvertFrom-Json).healthy) 'The company diagnostic missed a stopped database.'
     Compose-Command -Arguments @('up', '--detach', '--no-build', '--wait', '--wait-timeout', '120', 'database') | Out-Null
     Wait-Api
@@ -116,8 +123,26 @@ services:
     # A healthy exit at the end also clears the intentionally nonzero native status above.
     # Wait for the next container healthcheck after recovery before evaluating the snapshot.
     Compose-Command -Arguments @('up', '--detach', '--no-build', '--wait', '--wait-timeout', '120') | Out-Null
-    $restoredJson = & $shell -NoProfile -NonInteractive -File $diagnostics -CompanyId "login-$testId" -EnvironmentFile $company.EnvironmentFile
+    $restoredJson = & $shell -NoProfile -NonInteractive -File $diagnostics -CompanyId "login-$testId" -EnvironmentFile $company.EnvironmentFile @revisionArguments
     Assert-True ($LASTEXITCODE -eq 0 -and (($restoredJson -join "`n") | ConvertFrom-Json).healthy) 'The company diagnostic did not recover with the database.'
+    if ($ExpectedRevision -and $AgeDirectory) {
+        $extension=if ($IsWindows) {'.exe'} else {''}
+        $age=Join-Path $AgeDirectory "age$extension"
+        $keygen=Join-Path $AgeDirectory "age-keygen$extension"
+        $identity=Join-Path $testRoot 'release-test.agekey'
+        $recipient=Join-Path $testRoot 'release-recipient.txt'
+        Invoke-BackupCommand @{File=$keygen;Arguments=@('--output',$identity)} | Out-Null
+        $publicKey=Invoke-BackupCommand @{File=$keygen;Arguments=@('-y',$identity)}
+        [IO.File]::WriteAllText($recipient,$publicKey)
+        $backup=& (Join-Path $repository 'deploy/backup-company.ps1') -CompanyId "login-$testId" -EnvironmentFile $company.EnvironmentFile -RecipientFile $recipient -OutputDirectory $testRoot -AgeExecutable $age
+        Assert-True ($backup.ReleaseCommit -ceq $ExpectedRevision) 'The backup did not use the deployed backend image revision.'
+        $manifestProbe=@{matched=$false}
+        Invoke-InVaultBackupRestore -BackupFile $backup.BackupFile -CompanyId "login-$testId" -IdentityFile $identity -AgeExecutable $age -RestoreAction {
+            param($manifest,$sql)
+            $manifestProbe.matched = $manifest.releaseCommit -ceq $ExpectedRevision
+        }
+        Assert-True $manifestProbe.matched 'The encrypted manifest did not retain the deployed release identity.'
+    }
     Write-Host 'Login security passed: production proxy chain, spoofed headers rejected, per-account/IP limits, Retry-After, audit and restart persistence.'
     Write-Host 'Readiness passed: MySQL outage returns 503, Java stays live and database recovery restores availability without a backend restart.'
 } finally {

@@ -34,6 +34,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        INVAULT_BUILD_REVISION: ${INVAULT_BUILD_REVISION:-unversioned}
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -95,6 +97,8 @@ services:
     build:
       context: frontend
       dockerfile: Dockerfile
+      args:
+        INVAULT_BUILD_REVISION: ${INVAULT_BUILD_REVISION:-unversioned}
     restart: unless-stopped
     depends_on:
       backend:

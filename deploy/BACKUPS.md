@@ -45,8 +45,10 @@ Successful files have names such as `company-a-<UTC timestamp>-<UUID>.zip.age`.
 They are published by an atomic rename only after both dump and encryption exit
 successfully. Interrupted/failed dumps remove their `.part` file. The encrypted
 archive contains `database.sql` and a manifest recording company, database,
-Compose project, UTC timestamp and Git release commit. Pass `-ReleaseCommit <SHA>`
-when the installed checkout does not represent the deployed application release.
+Compose project, UTC timestamp and deployed Git release commit. The revision is
+read from the company's backend image, independently of the checkout. For a legacy
+unlabelled image, supply `-ReleaseCommit <verified-deployed-full-SHA>` explicitly;
+a mismatch with a known image revision is rejected. See [RELEASES.md](RELEASES.md).
 
 Use `-ReplicaDirectory /mnt/offsite/company-a` for an already mounted external
 destination. The script copies ciphertext, checks SHA-256 and publishes that copy
