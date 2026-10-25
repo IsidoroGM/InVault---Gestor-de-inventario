@@ -102,6 +102,14 @@ test('product and batch forms lead to auditable inbound and outbound balances', 
   await signIn(page);
   await expect(page).toHaveURL(/\/dashboard$/);
   await visit(page, '/products');
+  // Production CSP rejects inline event handlers. The complete stylesheet must
+  // be active without Angular's deferred media=print/onload critical-CSS loader.
+  await expect(page.locator('link[rel="stylesheet"][href^="styles-"]')).toHaveCount(1);
+  expect(
+    await page
+      .locator('link[rel="stylesheet"][href^="styles-"]')
+      .evaluate((link) => link.sheet !== null && matchMedia(link.media || 'all').matches),
+  ).toBe(true);
   await page.getByRole('button', { name: 'Nuevo producto', exact: true }).click();
   let dialog = page.getByRole('dialog');
   const sku = fixture.product.sku + '-UI';

@@ -90,6 +90,12 @@ las correcciones son suficientes; no se aprueba una imagen por cambiar su etique
 
 ## Ejecución y evidencia
 
+La comprobación de formularios verifica también que la hoja CSS de producción
+está cargada y activa con la política CSP real. Se desactiva únicamente la
+inserción de CSS crítico de Angular: su cargador diferido usa un evento onload
+inline que la CSP rechaza. El CSS sigue minimizado y se carga como hoja externa;
+las etiquetas decorativas dejan pasar los toques a los selectores en WebKit.
+
 Con Docker, Git, PowerShell 7.3+ y Node 24, desde un checkout limpio:
 
 ```powershell

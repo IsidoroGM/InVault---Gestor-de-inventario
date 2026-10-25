@@ -24,8 +24,9 @@ class GlobalExceptionHandlerLoggingTests {
             assertThat(response.getStatusCode().value()).isEqualTo(500);
             assertThat(appender.list).hasSize(1);
             assertThat(appender.list.getFirst().getFormattedMessage())
-                    .contains("IllegalStateException", "/api/products__FAKE_LOGIN_record")
-                    .doesNotContain("\r", "\n", "\u2028", "sensitive-test-value", "forged-entry");
+                    .contains("IllegalStateException", "GlobalExceptionHandlerLoggingTests")
+                    .doesNotContain("\r", "\n", "\u2028", "/api/products", "FAKE_LOGIN",
+                            "sensitive-test-value", "forged-entry");
             assertThat(appender.list.getFirst().getThrowableProxy()).isNull();
         } finally {
             logger.detachAppender(appender);

@@ -218,11 +218,9 @@ public class GlobalExceptionHandler {
             Exception exception,
             HttpServletRequest request
     ) {
-        String safePath = String.valueOf(request.getRequestURI()).replaceAll("[\\r\\n]", "_")
-                .replaceAll("[\\p{Cntrl}\\u0085\\u2028\\u2029]", "_");
-        // Exception messages can contain submitted values. Keep the server-side
-        // type/frames without allowing input to forge log lines or expose payloads.
-        LOGGER.error("Unhandled {} for {} at {}", exception.getClass().getName(), safePath,
+        // Requests and exception messages can contain submitted values. Keep only
+        // the server-side type/frames so logs never contain those untrusted payloads.
+        LOGGER.error("Unhandled {} at {}", exception.getClass().getName(),
                 java.util.Arrays.toString(exception.getStackTrace()));
         return errorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
