@@ -20,6 +20,8 @@ on:
       - frontend/package-lock.json
       - frontend/public/**
       - frontend/src/**
+      - frontend/e2e/**
+      - frontend/playwright.config.mjs
       - deploy/**
       - pom.xml
       - src/**
@@ -43,6 +45,8 @@ on:
       - frontend/package-lock.json
       - frontend/public/**
       - frontend/src/**
+      - frontend/e2e/**
+      - frontend/playwright.config.mjs
       - deploy/**
       - pom.xml
       - src/**
@@ -60,11 +64,24 @@ jobs:
   containers:
     name: Validate Compose and build images
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      - name: Set up Node for browser and load verification
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked browser test dependencies
+        run: npm --prefix frontend ci
+
+      - name: Verify fail-closed security report policies
+        run: node --test deploy/tests/security-policy.test.mjs
 
       - name: Validate production Compose model
         run: docker compose --env-file .env.production.example --file compose.prod.yml config --quiet
@@ -113,3 +130,44 @@ jobs:
           -FrontendImage '${{ steps.release.outputs.frontend }}'
           -ExpectedRevision '${{ steps.release.outputs.revision }}'
           -AgeDirectory '${{ runner.temp }}/invault-age/age'
+
+      - name: Install browser engines
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Verify browser flows and bounded concurrent workload
+        shell: pwsh
+        run: >-
+          ./deploy/tests/quality-stack.ps1
+          -BackendImage '${{ steps.release.outputs.backend }}'
+          -FrontendImage '${{ steps.release.outputs.frontend }}'
+          -ExpectedRevision '${{ steps.release.outputs.revision }}'
+          -ReportDirectory '${{ runner.temp }}/invault-quality-report'
+
+      - name: Install pinned Trivy scanner
+        uses: aquasecurity/setup-trivy@151a37f29c09e4ff49f853d2b23682e688bb1fa1 # v0.3.0
+        with:
+          version: v0.76.1
+          cache: true
+
+      - name: Analyze complete backend and frontend image inventories
+        run: |
+          mkdir -p '${{ runner.temp }}/invault-quality-report'
+          trivy image --scanners vuln --list-all-pkgs --timeout 10m --format json --output '${{ runner.temp }}/invault-quality-report/backend-security.json' '${{ steps.release.outputs.backend }}'
+          trivy image --scanners vuln --list-all-pkgs --timeout 10m --format json --output '${{ runner.temp }}/invault-quality-report/frontend-security.json' '${{ steps.release.outputs.frontend }}'
+
+      - name: Block fixable high and critical image vulnerabilities
+        run: |
+          status=0
+          node deploy/tests/security-policy.mjs '${{ runner.temp }}/invault-quality-report/backend-security.json' backend || status=1
+          node deploy/tests/security-policy.mjs '${{ runner.temp }}/invault-quality-report/frontend-security.json' frontend || status=1
+          exit "$status"
+
+      - name: Retain disposable quality reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: quality-reports
+          path: ${{ runner.temp }}/invault-quality-report
+          if-no-files-found: ignore
+          retention-days: 14

@@ -262,6 +262,11 @@ npm start
 
 ## Verification
 
+The [extended quality controls](deploy/QUALITY_VERIFICATION_ES.md) run browser
+flows against disposable real containers, a bounded concurrent workload, CodeQL
+source analysis and Trivy image analysis. Reports include the full findings;
+high-severity policy gates and inventory checks prevent silent approval.
+
 Run the same essential checks used by CI before opening a pull request.
 
 Backend:
