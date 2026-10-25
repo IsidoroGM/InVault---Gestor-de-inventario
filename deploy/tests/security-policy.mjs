@@ -44,14 +44,19 @@ export function assessSarif(report) {
   assert.ok(report.runs?.length > 0, "No SAST analysis was recorded");
   const findings = report.runs.flatMap((run) =>
     (run.results ?? []).map((result) => {
-      const rule = run.tool.driver.rules.find(
-        (candidate) => candidate.id === result.ruleId,
+      const rules = [run.tool.driver, ...(run.tool.extensions ?? [])].flatMap(
+        (component) => component.rules ?? [],
       );
+      const ruleId = result.ruleId ?? result.rule?.id;
+      const rule = rules.find((candidate) => candidate.id === ruleId);
       assert.ok(rule, "A SAST result has no rule metadata");
+      const score = Number(rule.properties?.["security-severity"] ?? 0);
+      assert.ok(Number.isFinite(score), "Invalid security severity");
       return {
-        rule: result.ruleId,
-        score: Number(rule.properties?.["security-severity"] ?? 0),
+        rule: ruleId,
+        score,
         file: result.locations?.[0]?.physicalLocation?.artifactLocation?.uri,
+        line: result.locations?.[0]?.physicalLocation?.region?.startLine,
       };
     }),
   );

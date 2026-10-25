@@ -94,3 +94,30 @@ test("unknown SAST rules cannot evade the severity gate", () => {
     }),
   );
 });
+test("CodeQL query-pack extension metadata preserves security scores", () => {
+  const result = assessSarif({
+    version: "2.1.0",
+    runs: [
+      {
+        tool: {
+          driver: { rules: [] },
+          extensions: [
+            {
+              name: "codeql/javascript-queries",
+              rules: [
+                {
+                  id: "extension/high",
+                  properties: { "security-severity": "9.1" },
+                },
+              ],
+            },
+          ],
+        },
+        results: [
+          { ruleId: "extension/high", rule: { toolComponent: { index: 0 } } },
+        ],
+      },
+    ],
+  });
+  assert.equal(result.blocking.length, 1);
+});

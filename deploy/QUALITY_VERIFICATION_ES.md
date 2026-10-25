@@ -61,7 +61,7 @@ un análisis vacío o un formato desconocido no puede dar la imagen por aprobada
 
 El frontend también conserva la auditoría npm de las dependencias bloqueadas. Las
 acciones nuevas de seguridad y conservación de informes se fijan por SHA. No se
-añaden listas de exclusión de vulnerabilidades. Los nueve casos de la política
+añaden listas de exclusión de vulnerabilidades. Los diez casos de la política
 comprueban rechazos y umbrales con informes de prueba.
 
 Un resultado correcto se refiere al código, imágenes, reglas y base de
