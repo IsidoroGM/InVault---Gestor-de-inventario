@@ -15,9 +15,10 @@ esta revisión y se conservan las imágenes identificadas por su SHA.
   Los informes completos se conservan; CSRF tiene una revisión exacta ligada al
   SHA-256 de su configuración y dos regresiones sobre credenciales del navegador.
 - La reconexión recupera inventario incluso si WebKit conserva un socket antiguo;
-  las etiquetas decorativas permiten pulsar los selectores.
-- Los errores inesperados registran tipo y marcos del servidor con URI saneada,
-  sin copiar mensajes de excepción que puedan contener datos enviados.
+  las etiquetas decorativas permiten pulsar los selectores. La hoja CSS externa
+  se carga directamente para respetar la CSP de producción.
+- Los errores inesperados registran tipo y marcos del servidor sin copiar rutas
+  ni mensajes de excepción que puedan contener datos enviados.
 - Spring Boot 4.1.2: Jackson 2.21.7/3.1.7, Tomcat 11.0.27 y Spring MVC 7.0.10.
   Bases oficiales actualizadas de Java, Node y nginx, con parches del sistema.
 

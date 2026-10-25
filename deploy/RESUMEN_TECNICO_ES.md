@@ -167,12 +167,15 @@ comprueba registrar cantidades decimales, recuperar un envío cuya respuesta se
 perdió, aplicar permisos y recuperar el inventario después de desconectarse.
 Los ensayos detectaron un socket que WebKit podía conservar y una etiqueta que
 tapaba un selector; se corrigieron ambos comportamientos y se conservaron pruebas.
+La hoja CSS se carga directamente: el cargador de CSS crítico generado por Angular
+usaba un evento inline bloqueado por la política CSP de producción.
 
 La carga repite 50 movimientos cuatro veces mientras se hacen 400 consultas. Debe
 haber 50 movimientos y un saldo de 6.25, con cero errores y tiempos dentro de los
 límites de CI. CodeQL revisa código y Trivy las imágenes: los hallazgos condujeron
 a actualizar Spring Boot y paquetes del sistema. Los registros de errores también
-se sanean para impedir líneas falsificadas y evitar copiar mensajes con datos.
+excluyen rutas y mensajes de excepción para impedir líneas falsificadas y evitar
+copiar datos enviados por el usuario.
 
 Los informes conservan lo observado y las revisiones justificadas. Estos ensayos
 no sustituyen las pruebas físicas ni el dimensionamiento del servidor. Procedimiento:
@@ -185,7 +188,8 @@ no sustituyen las pruebas físicas ni el dimensionamiento del servidor. Procedim
 3. Aplicar primero el backend y sus migraciones, y después publicar la PWA.
 4. Hacer una recuperación de ensayo en ese entorno y completar la matriz física.
 5. Completar el piloto y publicar la versión definitiva después de la aceptación
-   de esta candidata. La integración y etiqueta forman parte del cierre de fase 1.
+   de esta candidata. Cada candidata se integra y etiqueta después de verificar
+   los controles del commit correspondiente.
 
 La PWA necesita conexión para consultar datos actuales y registrar cambios. No se
 ha implementado una base independiente en cada dispositivo ni sincronización de
