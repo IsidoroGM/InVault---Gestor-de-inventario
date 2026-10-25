@@ -1,14 +1,16 @@
-# Entrega candidata de InVault 0.1.0-rc.1
+# Entrega candidata de InVault 0.1.0-rc.2
 
 Fecha de preparación: 25 de octubre de 2026.
-Etiqueta de código: `v0.1.0-rc.1`.
-Versión del backend y frontend: `0.1.0-rc.1`.
+Etiqueta de código: `v0.1.0-rc.2`.
+Versión del backend y frontend: `0.1.0-rc.2`.
 
-## Qué cierra la fase 1
+## Procedencia y cierre de la candidata
 
-La candidata reúne el MVP y los refuerzos del PR #15. El cierre consiste en revisar
+La candidata rc.1 cerró la fase 1 con el PR #15 y conserva su etiqueta histórica.
+La rc.2 incorpora las pruebas, el análisis de seguridad y las correcciones del PR #16.
+El cierre de la nueva candidata consiste en revisar
 los cambios y comentarios, corregir la documentación, alinear las versiones,
-comprobar CI, integrar en main, comprobar de nuevo el commit integrado y crear una
+comprobar los cuatro workflows, integrar en main, comprobar de nuevo el commit integrado y crear una
 etiqueta Git anotada sobre ese commit. La etiqueta permite volver al mismo código.
 
 Las [notas de versión](../CHANGELOG.md) enumeran funcionalidad y compatibilidad.
@@ -18,7 +20,7 @@ Los resultados de GitHub Actions permiten comprobar las pruebas del commit elegi
 La entrega fija las fuentes. Las imágenes de ensayo de CI son temporales; para
 instalar se construyen y conservan imágenes identificadas con su descriptor. El
 identificador de las imágenes y copias es el SHA completo del commit, mientras que
-`0.1.0-rc.1` es el nombre legible de esta candidata.
+`0.1.0-rc.2` es el nombre legible de esta candidata.
 
 ## Alcance revisado
 
@@ -39,14 +41,16 @@ validación funcional y de seguridad de las fases siguientes.
 
 1. El árbol Git está limpio; no se incluyen archivos de empresa ni claves.
 2. Backend, frontend y lockfile declaran la misma versión de aplicación.
-3. PR #15 sin conversaciones pendientes y con los tres workflows correctos.
+3. PR #16 sin conversaciones pendientes y con los cuatro workflows correctos.
 4. Integración normal del PR, conservando su historial, sin saltar controles.
 5. Los workflows del commit integrado en main terminan correctamente.
 6. La etiqueta anotada apunta a ese commit y se comprueba también en origin.
 
-Batería esperada: 89 pruebas Java habituales y 24 MySQL; 83 Angular; formato,
+Batería esperada: 92 pruebas Java habituales y 24 MySQL; 84 Angular; formato,
 auditoría npm y build; 34 casos de diagnóstico, 9 de versión y 16 de monitor de
 copias; construcción/inspección del JAR y ensayos reales de copias/proxies/readiness.
+Además: 24 recorridos de navegador, carga de 600 solicitudes, CodeQL Java/JavaScript,
+análisis de las imágenes y 12 controles de políticas. Ver [QUALITY_VERIFICATION_ES.md](QUALITY_VERIFICATION_ES.md).
 
 ## Obtener el código de la candidata
 
@@ -54,7 +58,7 @@ Desde un clon limpio del repositorio, una vez publicada la etiqueta:
 
 ```powershell
 git fetch origin --tags
-git switch --detach v0.1.0-rc.1
+git switch --detach v0.1.0-rc.2
 git rev-parse HEAD
 git status --short
 $release = ./deploy/build-release.ps1
@@ -78,7 +82,7 @@ Una recuperación se ensaya en un entorno aislado; no se borran volúmenes opera
 
 | Fase | Resultado pendiente |
 | --- | --- |
-| 2. Calidad ampliada | Recorridos completos en navegador, análisis del backend/imágenes y pruebas de carga. |
+| 2. Calidad ampliada | Controles implementados; el cierre de rc.2 exige todos los resultados correctos sobre el commit integrado. |
 | 3. Entorno real | Servidor, dominio, HTTPS y dos empresas de prueba con almacenamiento independiente. |
 | 4. Aceptación | Completar [PWA_ACCEPTANCE.md](PWA_ACCEPTANCE.md) en Windows, Android e iPad, con varios roles y dispositivos. |
 | 5. Operación | Activar copias, réplica externa, alertas y métricas; restaurar en el entorno elegido. |

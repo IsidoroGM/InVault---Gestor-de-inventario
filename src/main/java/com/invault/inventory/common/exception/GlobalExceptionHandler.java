@@ -218,7 +218,12 @@ public class GlobalExceptionHandler {
             Exception exception,
             HttpServletRequest request
     ) {
-        LOGGER.error("Unhandled error for {}", request.getRequestURI(), exception);
+        String safePath = String.valueOf(request.getRequestURI()).replaceAll("[\\r\\n]", "_")
+                .replaceAll("[\\p{Cntrl}\\u0085\\u2028\\u2029]", "_");
+        // Exception messages can contain submitted values. Keep the server-side
+        // type/frames without allowing input to forge log lines or expose payloads.
+        LOGGER.error("Unhandled {} for {} at {}", exception.getClass().getName(), safePath,
+                java.util.Arrays.toString(exception.getStackTrace()));
         return errorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected error occurred.",

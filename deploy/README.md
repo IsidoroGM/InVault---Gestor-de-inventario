@@ -53,7 +53,7 @@ The host must accept inbound TCP traffic on ports 80 and 443 and UDP traffic on 
 
 ## First deployment
 
-For candidate `v0.1.0-rc.1`, start with the
+For candidate `v0.1.0-rc.2`, start with the
 [candidate handover](RELEASE_CANDIDATE_ES.md) and [release notes](../CHANGELOG.md).
 The tag identifies application sources; container images are built separately
 with the identified release helper.

@@ -1,5 +1,31 @@
 # Historial de versiones de InVault
 
+## 0.1.0-rc.2 — 2026-10-25
+
+Candidata con verificación ampliada y correcciones de la fase 2. Mantiene la
+etiqueta anterior como referencia histórica; para instalaciones nuevas se utiliza
+esta revisión y se conservan las imágenes identificadas por su SHA.
+
+- 24 recorridos de navegador contra el stack real: escritorio, Android emulado y
+  WebKit con perfil iPad; contraseñas, roles, productos/lotes, movimientos,
+  reintentos tras respuesta perdida, sincronización y desconexión.
+- Carga limitada: 400 lecturas y 200 envíos concurrentes para 50 movimientos únicos;
+  saldo/historial exactos, respuestas idempotentes y métricas p95.
+- CodeQL Java/JavaScript, Trivy de imágenes reales y 12 controles de políticas.
+  Los informes completos se conservan; CSRF tiene una revisión exacta ligada al
+  SHA-256 de su configuración y dos regresiones sobre credenciales del navegador.
+- La reconexión recupera inventario incluso si WebKit conserva un socket antiguo;
+  las etiquetas decorativas permiten pulsar los selectores.
+- Los errores inesperados registran tipo y marcos del servidor con URI saneada,
+  sin copiar mensajes de excepción que puedan contener datos enviados.
+- Spring Boot 4.1.2: Jackson 2.21.7/3.1.7, Tomcat 11.0.27 y Spring MVC 7.0.10.
+  Bases oficiales actualizadas de Java, Node y nginx, con parches del sistema.
+
+La entrega exige los cuatro workflows correctos, incluidos navegador, carga y
+políticas de seguridad, antes de integrar y etiquetar. Guía:
+[verificación de fase 2](deploy/QUALITY_VERIFICATION_ES.md). Continúan pendientes
+el entorno real, aceptación física PWA, operación y piloto.
+
 ## 0.1.0-rc.1 — 2026-10-25
 
 Primera candidata del MVP completo. Etiqueta: `v0.1.0-rc.1`.

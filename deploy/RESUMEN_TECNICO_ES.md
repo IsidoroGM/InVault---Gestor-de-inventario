@@ -9,6 +9,10 @@ su código mediante la etiqueta `v0.1.0-rc.1`, después de las comprobaciones y 
 integración del PR #15. Las [notas de entrega](RELEASE_CANDIDATE_ES.md) explican
 qué incluye, cómo obtenerla y qué falta para ponerla en servicio.
 
+La fase 2 prepara **0.1.0-rc.2**: recorridos completos del navegador, carga limitada,
+análisis de código e imágenes y correcciones detectadas por esos controles. La
+etiqueta anterior permanece como referencia histórica.
+
 ## 1. Cada empresa conserva su propia información
 
 La PWA es la aplicación que se instala desde el navegador. Se conecta al backend,
@@ -155,6 +159,24 @@ descargado código más nuevo en la carpeta. Para instalaciones antiguas sin esa
 marca hay que indicar su versión comprobada; una versión que contradiga la imagen
 se rechaza. Así, la recuperación conserva una referencia fiel de la aplicación
 que estaba atendiendo a la empresa. Guía: [RELEASES.md](RELEASES.md).
+
+## 11. Comprobar la aplicación completa y sus dependencias
+
+El navegador maneja los formularios reales con MySQL detrás de los proxies. Se
+comprueba registrar cantidades decimales, recuperar un envío cuya respuesta se
+perdió, aplicar permisos y recuperar el inventario después de desconectarse.
+Los ensayos detectaron un socket que WebKit podía conservar y una etiqueta que
+tapaba un selector; se corrigieron ambos comportamientos y se conservaron pruebas.
+
+La carga repite 50 movimientos cuatro veces mientras se hacen 400 consultas. Debe
+haber 50 movimientos y un saldo de 6.25, con cero errores y tiempos dentro de los
+límites de CI. CodeQL revisa código y Trivy las imágenes: los hallazgos condujeron
+a actualizar Spring Boot y paquetes del sistema. Los registros de errores también
+se sanean para impedir líneas falsificadas y evitar copiar mensajes con datos.
+
+Los informes conservan lo observado y las revisiones justificadas. Estos ensayos
+no sustituyen las pruebas físicas ni el dimensionamiento del servidor. Procedimiento:
+[QUALITY_VERIFICATION_ES.md](QUALITY_VERIFICATION_ES.md).
 
 ## Lo que queda para una puesta en marcha real
 

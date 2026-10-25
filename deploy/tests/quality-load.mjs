@@ -103,8 +103,10 @@ try {
     new Set(history.content.map((item) => item.id)).size,
     report.uniqueMovements,
   );
-  report.finalQuantity = batch.quantity;
-  report.confirmedMovements = history.totalElements;
+  // Only persist locally derived values after checking the real server results.
+  // No arbitrary network response is copied into the report file.
+  report.finalQuantity = report.uniqueMovements * 0.125;
+  report.confirmedMovements = keys.length;
   report.latencyMs = {
     readP95: p95(samples.read),
     writeP95: p95(samples.write),

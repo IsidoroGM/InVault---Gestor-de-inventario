@@ -14,8 +14,8 @@ The current user interface is in Spanish. Source code, API contracts, database o
 
 ## Project status
 
-The current release candidate is **0.1.0-rc.1**, identified by the Git tag
-`v0.1.0-rc.1`. See [release notes](CHANGELOG.md) and the
+The current release candidate is **0.1.0-rc.2**, identified by the Git tag
+`v0.1.0-rc.2`. See [release notes](CHANGELOG.md) and the
 [candidate handover in Spanish](deploy/RELEASE_CANDIDATE_ES.md) for its scope,
 verification and outstanding acceptance work. Backend and frontend share this
 application version; the Spring Boot parent keeps its own independent version.
