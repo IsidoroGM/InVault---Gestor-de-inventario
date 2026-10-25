@@ -4,6 +4,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 
 import { AuthSessionStore } from '../../core/auth/auth-session.store';
 import { InventoryRealtimeService } from '../../core/realtime/inventory-realtime.service';
+import { CompanyProfileService } from '../../core/services/company-profile.service';
 import { Role } from '../../shared/models/role.model';
 
 @Component({
@@ -22,6 +23,11 @@ export class TopbarComponent {
 
   protected readonly session = this.store.session;
   protected readonly realtime = inject(InventoryRealtimeService);
+  protected readonly company = inject(CompanyProfileService);
+
+  constructor() {
+    this.company.load();
+  }
 
   protected initials(username: string): string {
     return username.slice(0, 2).toUpperCase();

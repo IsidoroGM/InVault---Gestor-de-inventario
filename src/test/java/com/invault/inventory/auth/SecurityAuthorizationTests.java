@@ -350,6 +350,15 @@ class SecurityAuthorizationTests {
         verifyNoInteractions(authService);
     }
 
+    @Test
+    void companyProfileRequiresAuthenticationAndAllowsReadOnlyAccounts() throws Exception {
+        mockMvc.perform(get("/api/company")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/company").header("Authorization", bearerToken("READ_ONLY")))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.name").value("InVault"));
+    }
+
     private String bearerToken(String role) {
         return bearerToken(role, false);
     }

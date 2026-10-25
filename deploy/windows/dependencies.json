@@ -1,0 +1,28 @@
+{
+  "mysql": {
+    "version": "8.4.13",
+    "file": "mysql-8.4.13-winx64.zip",
+    "url": "https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.13-winx64.zip",
+    "sha256": "e9cd98b1d23f122987b1afca26ad942efec5891481103d48ae3cde237fa3ea54"
+  },
+  "caddy": {
+    "version": "2.11.4",
+    "file": "caddy_2.11.4_windows_amd64.zip",
+    "url": "https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_windows_amd64.zip",
+    "sha256": "1708333f79e274c7697285afe6d592ab39314e0b131e9ec6bea08ad27df62ebf",
+    "sha512": "cd5ccfd86a4b40732cf715890d0dca5bf3f63adefec5a7914de85adf240c60ce7e5d2791631b88ef9758e46b23bb1730e020b9c5d696889740b284ffd4788e35"
+  },
+  "tailscale": {
+    "version": "1.104.2",
+    "file": "tailscale-setup-1.104.2-amd64.msi",
+    "url": "https://dl.tailscale.com/stable/tailscale-setup-1.104.2-amd64.msi",
+    "sha256": "7eff4abdcbcf592ac9bce28f2b9f0fd51f8fc09194c955fbe8253b67b531e7f5",
+    "signer": "Tailscale Inc."
+  },
+  "vcRuntime": {
+    "file": "VC_redist.x64.exe",
+    "url": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+    "sha256": "cc0ff0eb1dc3f5188ae6300faef32bf5beeba4bdd6e8e445a9184072096b713b",
+    "signer": "Microsoft Corporation"
+  }
+}
