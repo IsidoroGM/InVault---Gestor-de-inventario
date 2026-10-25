@@ -48,3 +48,4 @@ compose.override.yml
 *.age.part
 *.agekey
 /releases/
+/quality-results/

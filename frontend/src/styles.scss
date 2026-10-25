@@ -52,6 +52,16 @@ textarea {
   background: #315cc8;
 }
 
+// Outlined labels are decorative over select triggers. WebKit must pass taps
+// through the outline and required marker to the accessible control beneath.
+.mat-mdc-form-field.mat-mdc-form-field-type-mat-select .mdc-notched-outline,
+.mat-mdc-form-field.mat-mdc-form-field-type-mat-select .mdc-notched-outline *,
+.mat-mdc-form-field.mat-mdc-form-field-type-mat-select
+  .mdc-notched-outline
+  .mat-mdc-floating-label.mdc-floating-label {
+  pointer-events: none;
+}
+
 @media (pointer: coarse) {
   button,
   [role='button'],

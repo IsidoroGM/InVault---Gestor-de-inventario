@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "rule": "java/spring-disabled-csrf-protection",
+      "file": "src/main/java/com/invault/inventory/config/SecurityConfig.java",
+      "sha256": "afb33a7c3d489fdb5c4b4f7943e2ea641e9936e3bb7f594332d1e01736fb327d",
+      "reason": "Reviewed 2026-10-25: the API accepts explicit bearer JWTs, uses STATELESS security and has no cookie, session, form-login or HTTP Basic authentication. Regression tests reject signed JWTs in cookies, ambient authenticated sessions, cross-origin login and form login. Any source change expires this exact-file review; enabling ambient credentials requires a new CSRF design."
+    }
+  ]
+}

@@ -14,8 +14,8 @@ The current user interface is in Spanish. Source code, API contracts, database o
 
 ## Project status
 
-The current release candidate is **0.1.0-rc.1**, identified by the Git tag
-`v0.1.0-rc.1`. See [release notes](CHANGELOG.md) and the
+The current release candidate is **0.1.0-rc.2**, identified by the Git tag
+`v0.1.0-rc.2`. See [release notes](CHANGELOG.md) and the
 [candidate handover in Spanish](deploy/RELEASE_CANDIDATE_ES.md) for its scope,
 verification and outstanding acceptance work. Backend and frontend share this
 application version; the Spring Boot parent keeps its own independent version.
@@ -262,6 +262,11 @@ npm start
 
 ## Verification
 
+The [extended quality controls](deploy/QUALITY_VERIFICATION_ES.md) run browser
+flows against disposable real containers, a bounded concurrent workload, CodeQL
+source analysis and Trivy image analysis. Reports include the full findings;
+high-severity policy gates and inventory checks prevent silent approval.
+
 Run the same essential checks used by CI before opening a pull request.
 
 Backend:
@@ -464,7 +469,7 @@ The following items are not part of the current implementation or remain recomme
 - Complete deployment acceptance with independent MySQL volumes, container/database restart and backup restoration; automated real-MySQL integration checks already cover migrations, concurrency, rollback, company isolation and application restart.
 - Connect the existing login-throttling audit and company/backup diagnostics to operational alerts on the target hosts. Persistent login rate limiting is already implemented.
 - Add metrics, distributed tracing, richer structured logs, and correlation IDs.
-- Add full browser-flow tests, load tests, coverage thresholds, backend/image dependency scanning, and static application security testing. Frontend CI already audits npm dependencies.
+- Broaden browser and load coverage beyond the core disposable workload, and add coverage thresholds. The extended quality controls already include browser flows, bounded load, CodeQL and runtime image/dependency scanning; frontend CI also audits npm dependencies.
 - Replace the in-memory STOMP broker before horizontally scaling the backend.
 - Introduce per-device sessions if global user token revocation is too coarse for future requirements.
 - Activate per-company backup timers, external replicas and recovery acceptance on the production hosts; encrypted backup and isolated restoration scripts are already verified in CI.

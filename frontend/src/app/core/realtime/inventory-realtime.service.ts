@@ -3,12 +3,14 @@ import { Client, IMessage } from '@stomp/stompjs';
 
 import { AuthSessionStore } from '../auth/auth-session.store';
 import { API_CONFIGURATION } from '../configuration/api-configuration';
+import { NetworkStatusService } from '../pwa/network-status.service';
 import { InventoryEvent, RealtimeState } from './inventory-event.model';
 
 @Injectable({ providedIn: 'root' })
 export class InventoryRealtimeService {
   private readonly store = inject(AuthSessionStore);
   private readonly configuration = inject(API_CONFIGURATION);
+  private readonly network = inject(NetworkStatusService);
   private client: Client | null = null;
 
   private readonly stateSignal = signal<RealtimeState>('disconnected');
@@ -22,7 +24,12 @@ export class InventoryRealtimeService {
   constructor() {
     effect((onCleanup) => {
       const session = this.store.session();
-      if (session && this.store.hasValidSession() && !session.mustChangePassword) {
+      if (
+        this.network.online() &&
+        session &&
+        this.store.hasValidSession() &&
+        !session.mustChangePassword
+      ) {
         this.connect(session.accessToken);
       } else {
         this.disconnect();

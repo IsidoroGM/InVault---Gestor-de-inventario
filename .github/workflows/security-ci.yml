@@ -1,0 +1,67 @@
+name: Security CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - if: matrix.build-mode == 'manual'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - name: Initialize source analysis
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+      - name: Compile runtime Java sources under analysis
+        if: matrix.build-mode == 'manual'
+        run: bash ./mvnw --batch-mode --no-transfer-progress clean package -Dmaven.test.skip=true
+      - name: Analyze and upload findings
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          category: /language:${{ matrix.language }}
+          output: ${{ runner.temp }}/codeql-results
+          upload: false
+      - name: Block high and critical source findings
+        run: node deploy/tests/security-policy.mjs '${{ runner.temp }}/codeql-results' sarif
+      - name: Retain source analysis reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: codeql-${{ matrix.language }}
+          path: ${{ runner.temp }}/codeql-results
+          if-no-files-found: ignore
+          retention-days: 14

@@ -218,7 +218,10 @@ public class GlobalExceptionHandler {
             Exception exception,
             HttpServletRequest request
     ) {
-        LOGGER.error("Unhandled error for {}", request.getRequestURI(), exception);
+        // Requests and exception messages can contain submitted values. Keep only
+        // the server-side type/frames so logs never contain those untrusted payloads.
+        LOGGER.error("Unhandled {} at {}", exception.getClass().getName(),
+                java.util.Arrays.toString(exception.getStackTrace()));
         return errorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected error occurred.",

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24.17.0-alpine3.23 AS build
+FROM node:24.22.1-alpine3.24 AS build
 WORKDIR /workspace
 
 COPY package.json package-lock.json ./
@@ -11,7 +11,9 @@ COPY public ./public
 COPY src ./src
 RUN npm run build
 
-FROM nginx:1.28.3-alpine3.23
+FROM nginx:1.30.6-alpine3.24
+
+RUN apk upgrade --no-cache
 
 ARG INVAULT_BUILD_REVISION=unversioned
 LABEL org.opencontainers.image.revision="$INVAULT_BUILD_REVISION"
