@@ -60,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/health",
+                                "/api/health/readiness",
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/api/auth/login",

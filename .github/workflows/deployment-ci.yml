@@ -76,6 +76,10 @@ jobs:
         shell: pwsh
         run: ./deploy/tests/company-isolation.ps1
 
+      - name: Verify company configuration and runtime diagnostics
+        shell: pwsh
+        run: ./deploy/tests/company-status.ps1
+
       - name: Install verified age encryption tools
         shell: pwsh
         run: ./deploy/install-age.ps1 -Destination "${{ runner.temp }}/invault-age"

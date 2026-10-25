@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $generator = Join-Path $projectRoot "deploy/new-company.ps1"
+Import-Module (Join-Path $projectRoot 'deploy/CompanyStatus.psm1') -Force
 $compose = Join-Path $projectRoot "compose.prod.yml"
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) "invault-company-check-$([Guid]::NewGuid().ToString('N'))"
 [void][IO.Directory]::CreateDirectory($testRoot)
@@ -94,6 +95,7 @@ try {
     }
     foreach ($entry in @(@{ Company = $first; Values = $firstValues; Model = $firstModel }, @{ Company = $second; Values = $secondValues; Model = $secondModel })) {
         $model = $entry.Model
+        Assert-True (Get-InVaultCompanyConfigurationStatus -CompanyId $entry.Company.CompanyId -Model $model).configurationValid "El diagnóstico rechazó una empresa generada y renderizada por Compose."
         $values = $entry.Values
         Assert-True ($model.name -eq $entry.Company.ProjectName) "El proyecto efectivo no corresponde a la empresa."
         Assert-True ($model.services.database.environment.MYSQL_DATABASE -eq $values.DB_NAME) "MySQL usa una base distinta a la configurada."

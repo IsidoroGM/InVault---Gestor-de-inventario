@@ -71,7 +71,11 @@ services:
           "curl",
           "--fail",
           "--silent",
-          "http://localhost:8080/actuator/health",
+          "--max-time",
+          "4",
+          "--connect-timeout",
+          "2",
+          "http://localhost:8080/api/health/readiness",
         ]
       interval: 15s
       timeout: 5s

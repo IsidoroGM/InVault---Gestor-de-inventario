@@ -105,6 +105,12 @@ class SecurityAuthorizationTests {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(get("/api/health/readiness"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.components").doesNotExist());
+
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));

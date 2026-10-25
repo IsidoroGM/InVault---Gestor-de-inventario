@@ -28,6 +28,6 @@ EXPOSE 8080
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Duser.timezone=UTC"
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=45s --retries=5 \
-  CMD curl --fail --silent --show-error http://localhost:8080/actuator/health >/dev/null || exit 1
+  CMD curl --fail --silent --show-error --max-time 4 --connect-timeout 2 http://localhost:8080/api/health/readiness >/dev/null || exit 1
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

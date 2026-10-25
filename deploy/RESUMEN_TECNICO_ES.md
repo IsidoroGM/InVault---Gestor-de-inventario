@@ -110,6 +110,33 @@ Un resultado correcto permite revisar el cambio con evidencia. No significa que
 la empresa ya esté usando esa versión: desplegarla y probar Windows, Android e
 iPad son pasos posteriores. La lista está en [PWA_ACCEPTANCE.md](PWA_ACCEPTANCE.md).
 
+## 8. Comprobar que el servicio puede trabajar
+
+Se añadió una comprobación de disponibilidad que pregunta tanto al estado de Java
+como a MySQL. Devuelve `UP` con HTTP 200 cuando puede atender peticiones y `DOWN`
+con HTTP 503 cuando no puede hacerlo. El resultado público no contiene detalles
+de la base ni credenciales. Java puede seguir vivo durante una caída de MySQL;
+eso ya no se presenta como servicio disponible en el panel.
+
+La PWA utiliza esta comprobación, espera como máximo ocho segundos y descarta
+respuestas anteriores si se inicia otra consulta. Se prueba perder el acceso a
+la base y recuperarlo, incluyendo detener el MySQL temporal detrás de los proxies,
+sin reiniciar Java. Guía: [READINESS.md](READINESS.md).
+
+## 9. Diagnosticar una empresa antes y después del arranque
+
+El comando `deploy/check-company.ps1` lee su configuración y comprueba que proyecto,
+base, credenciales, orígenes, redes y volumen correspondan a esa empresa. Antes
+del primer arranque se puede usar solo para validar la configuración.
+
+Con la empresa en marcha comprueba además sus cuatro contenedores, detecta ajustes
+de base/JWT que no coincidan con el archivo y hace una consulta nueva de
+disponibilidad. Puede incluir las comprobaciones de copias y réplica. Devuelve
+JSON y un código de salida para que el mantenimiento pueda automatizarse.
+No inicia servicios ni modifica existencias y su informe omite claves y contraseñas.
+DNS, certificados y pruebas de dispositivos siguen requiriendo aceptación aparte.
+Guía: [COMPANY_DIAGNOSTICS.md](COMPANY_DIAGNOSTICS.md).
+
 ## Lo que queda para una puesta en marcha real
 
 1. Fijar el servidor, dominio y almacenamiento externo de copias para cada empresa.

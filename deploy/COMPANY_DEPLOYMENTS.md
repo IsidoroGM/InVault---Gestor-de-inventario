@@ -102,6 +102,11 @@ different application sources.
 
 ## Verification before onboarding
 
+Before starting an individual company, use the read-only
+[company diagnostic](COMPANY_DIAGNOSTICS.md) with `-ConfigurationOnly`. After startup,
+run it without that switch to verify container identity, volume/networks, selected
+settings and database readiness. Public HTTPS and device acceptance remain separate.
+
 Run the deployment configuration check with Docker Compose installed:
 
 ~~~powershell

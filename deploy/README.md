@@ -121,6 +121,16 @@ Do not use `docker compose down --volumes` in production: it deletes the MySQL v
 
 ## Operations
 
+Check `https://your-domain.example/api/health/readiness` for HTTP 200/`UP` before
+using the company. HTTP 503/`DOWN` includes a database outage; `/healthz` only
+checks static serving and `/api/health` only checks Java liveness. See
+[`READINESS.md`](READINESS.md) for deadlines, PWA display and recovery tests.
+
+Run [`check-company.ps1`](check-company.ps1) with the company ID and its environment
+file for a JSON diagnostic of configuration, isolation, containers and readiness.
+Use `-ConfigurationOnly` before the first start, or include backup/replica paths
+during maintenance. See [`COMPANY_DIAGNOSTICS.md`](COMPANY_DIAGNOSTICS.md).
+
 ```bash
 docker compose --env-file .env --file compose.prod.yml logs --follow gateway backend frontend
 docker compose --env-file .env --file compose.prod.yml restart backend

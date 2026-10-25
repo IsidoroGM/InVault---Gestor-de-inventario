@@ -1,10 +1,13 @@
 # Real MySQL integration tests
 
-The `mysql-it` Maven profile adds twenty-two Failsafe tests to the ordinary backend
+The `mysql-it` Maven profile adds twenty-four Failsafe tests to the ordinary backend
 suite. It requires a disposable MySQL **8.4 LTS** server and fails if the server or
 test credentials are missing. Regular `mvn verify` remains available without MySQL.
 
 The tests exercise:
+
+- Readiness with real database authentication loss/recovery and application
+  availability events, keeping process liveness independent of the database.
 
 - All migrations on an empty database, InnoDB tables, decimal scale, production
   Hibernate schema validation, and repeated migration without further changes.
