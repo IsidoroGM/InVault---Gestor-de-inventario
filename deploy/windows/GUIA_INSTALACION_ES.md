@@ -141,6 +141,12 @@ HTTPS con otras topologías permanecen documentados en
 - **Permiso insuficiente:** abre el instalador como administrador y elige carpetas locales accesibles. No se admiten carpetas de red o con enlaces/redirecciones.
 - **Sin espacio:** libera espacio en los discos indicados y reintenta con el mismo instalador.
 - **No inicia:** consulta la carpeta `logs`; no compartas configuraciones ni copias que contengan secretos.
+- **Tailscale, código 1619:** Windows Installer no pudo abrir su MSI. Las versiones
+  corregidas normalizan la ruta de Windows antes de ejecutarlo. Actualiza con el
+  nuevo instalador y reintenta desde **Mantenimiento → Conectar tablets…**. Si
+  persiste, el mensaje muestra el registro `logs/tailscale-install-<id>.log`.
+- **Tailscale, código 1618:** hay otra instalación en curso. Espera a que termine y
+  vuelve a intentarlo; no finalices el servicio Windows Installer.
 - **Reinicio pendiente:** termina las actualizaciones de Windows y vuelve a ejecutar el instalador.
 
 El instalador solo anuncia éxito después de comprobar readiness del backend con MySQL y la entrega de la interfaz a través del servidor local.

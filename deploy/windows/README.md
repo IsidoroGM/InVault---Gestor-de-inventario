@@ -80,6 +80,14 @@ checks the extracted MSI against the package manifest. Existing clients are kept
 the optional install runs only after local application readiness and its failure
 does not fail the application installation.
 
+Manifest paths use forward slashes; `msiexec` source and log arguments are always
+converted to full native Windows paths. The mixed path is accepted by .NET and
+`MsiOpenDatabase` but fails in the Windows Installer client with error 1619.
+Installation writes a verbose diagnostic log in the protected company logs directory.
+The packaged-runtime smoke test performs a real administrative extraction of the
+pinned MSI (whose administrative sequence contains only standard extraction actions)
+to exercise this boundary without installing Tailscale or its VPN service.
+
 Maintenance provides **Conectar tablets…** for interactive enrollment, opening the
 official DNS/HTTPS settings, private Serve activation, checking and targeted
 deactivation. Account sign-in and HTTPS authorization belong to the operator.

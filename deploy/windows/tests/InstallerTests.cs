@@ -91,6 +91,7 @@ public static class InstallerTests {
         Check("gateway_loopback", Engine.CaddyConfiguration(c).Contains("bind 127.0.0.1"));
         Check("gateway_websocket", Engine.CaddyConfiguration(c).Contains("/ws"));
         RemoteTests(c);
+        MsiCommandTests();
         // Exercise the actual uninstall cleanup policy with disposable files, no registry or services.
         Directory.CreateDirectory(c.ReleaseRoot);
         string installedFile = Path.Combine(c.ReleaseRoot, "installed.txt"); File.WriteAllText(installedFile, "owned component");
@@ -106,6 +107,25 @@ public static class InstallerTests {
         Check("uninstall_preserves_modified_files", File.Exists(changedFile));
         Check("uninstall_preserves_company_data", File.Exists(c.FilePath) && File.Exists(Path.Combine(c.DataRoot, "secrets.bin")));
         Check("uninstall_preserves_other_files", File.ReadAllText(external) == "unrelated");
+    }
+    static void MsiCommandTests() {
+        string directory = Path.Combine(root, "MSI con espacios y tildes á"); Directory.CreateDirectory(directory);
+        string mixed = directory + "/tailscale.msi", log = directory + "/instalación.log";
+        var command = RemoteAccess.ClientInstallerStartInfo(mixed, log);
+        Check("msi_native_source_directory", command.WorkingDirectory == directory && !command.WorkingDirectory.Contains('/'));
+        Check("msi_native_source_path", command.Arguments.Contains(Rules.Quote(Path.GetFullPath(mixed))) && !command.Arguments.Contains("/tailscale.msi"));
+        Check("msi_native_diagnostic_log", command.Arguments.Contains("/L*v " + Rules.Quote(Path.GetFullPath(log))));
+        Check("msi_no_shell_or_forced_reboot", !command.UseShellExecute && command.Arguments.Contains("/norestart"));
+        // Check the actual Windows process argument boundary, without running an installer in unit tests.
+        command.FileName = Assembly.GetExecutingAssembly().Location; command.Arguments = "--echo " + command.Arguments;
+        command.RedirectStandardOutput = true; command.StandardOutputEncoding = Encoding.UTF8;
+        using (var process = Process.Start(command)) {
+            string output = process.StandardOutput.ReadToEnd(); process.WaitForExit();
+            string[] args = Store.Json.Deserialize<string[]>(output);
+            Check("msi_argument_roundtrip", process.ExitCode == 0 && args.SequenceEqual(new[] { "/i", Path.GetFullPath(mixed), "/passive", "/norestart", "/L*v", Path.GetFullPath(log) }));
+        }
+        Check("msi_1619_actionable_diagnostic", RemoteAccess.ClientInstallerFailure(1619, log).Contains("no pudo abrir") && RemoteAccess.ClientInstallerFailure(1619, log).Contains(Path.GetFullPath(log)));
+        Check("msi_1618_busy_diagnostic", RemoteAccess.ClientInstallerFailure(1618, log).Contains("otra instalación en curso"));
     }
     sealed class FakeTailscale {
         public string Json = "{}", Backend = "Running", NodeId = "node-test", Host = "invault.example.ts.net";
@@ -190,6 +210,17 @@ public static class InstallerTests {
         Directory.CreateDirectory(c.DataRoot); c.Save(); Secrets.Create("Temporary-test-123").Save(c);
         using (var s = assembly.GetManifestResourceStream("payload.zip")) m.Extract(s, c.ReleaseRoot, CancellationToken.None, Console.WriteLine);
         Check("embedded_payload_integrity", true);
+        // Regression for error 1619: exercise the real msiexec client path parser using
+        // the pinned MSI's standard administrative extraction, without installing its VPN/service.
+        // This MSI's AdminExecuteSequence was checked to contain only standard extraction actions.
+        string administrativeImage = Path.Combine(root, "MSI extraído á"), msiLog = Path.Combine(root, "msi-open.log");
+        var msiCommand = RemoteAccess.ClientInstallerStartInfo(c.ReleaseRoot + "/prerequisites/tailscale.msi", msiLog);
+        msiCommand.Arguments = "/a " + msiCommand.Arguments.Substring(3).Replace(" /passive ", " /qn ") + " TARGETDIR=" + Rules.Quote(administrativeImage);
+        using (var process = Process.Start(msiCommand)) {
+            if (!process.WaitForExit(90000)) throw new IOException("La extracción administrativa MSI sigue en curso; no se interrumpe Windows Installer.");
+            Check("real_msiexec_opens_packaged_tailscale", process.ExitCode == 0);
+        }
+        Check("real_msi_administrative_image", Directory.GetFiles(administrativeImage, "tailscale.exe", SearchOption.AllDirectories).Length == 1);
         using (var engine = new Engine(c, CancellationToken.None, Console.WriteLine)) {
             engine.Start(); Check("real_mysql_readiness", Engine.Healthy(c.Url + "/api/health/readiness"));
             var session = Request(c.Url + "/api/auth/login", "POST", new { username = "admin", password = "Temporary-test-123" }, null);

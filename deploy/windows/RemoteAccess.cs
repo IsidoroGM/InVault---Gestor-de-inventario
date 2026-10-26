@@ -158,19 +158,36 @@ namespace InVault.Windows {
         }
         public static void InstallClient(InstallConfig c) {
             if (File.Exists(ClientPath)) return; // Keep existing accounts, settings, and newer clients.
-            string relative = "prerequisites/tailscale.msi", package = Path.Combine(c.ReleaseRoot, relative);
+            // Manifest paths use '/', but msiexec requires a native Windows source path.
+            // File.Exists and even MsiOpenDatabase accept the mixed form that msiexec rejects with 1619.
+            string relative = "prerequisites/tailscale.msi", package = Rules.SafeChild(c.ReleaseRoot, relative);
             var manifest = Store.ReadJson<PackageManifest>(Path.Combine(c.ReleaseRoot, "package.json")); manifest.Validate();
             string expected;
             if (!manifest.Files.TryGetValue(relative, out expected) || !File.Exists(package) || Store.HashFile(package) != expected)
                 throw new IOException("El paquete de Tailscale falta o está dañado. Actualiza InVault con el instalador completo.");
-            using (var process = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "msiexec.exe"),
-                "/i " + Rules.Quote(package) + " /passive /norestart") { UseShellExecute = false })) {
+            string logs = Path.Combine(c.DataRoot, "logs"); Directory.CreateDirectory(logs);
+            string log = Path.Combine(logs, "tailscale-install-" + Guid.NewGuid().ToString("N") + ".log");
+            using (var process = Process.Start(ClientInstallerStartInfo(package, log))) {
                 // Never kill Windows Installer: allow its own rollback/completion if the wait expires.
                 if (!process.WaitForExit(300000)) throw new IOException("Windows Installer sigue trabajando. Espera a que termine antes de volver a intentar la instalación.");
                 if (process.ExitCode == 3010 || process.ExitCode == 1641) throw new IOException("Tailscale requiere reiniciar Windows. InVault seguirá disponible en este PC.");
-                if (process.ExitCode != 0) throw new IOException("Tailscale no se instaló (código " + process.ExitCode + "). Puedes reintentarlo desde Mantenimiento.");
+                if (process.ExitCode != 0) throw new IOException(ClientInstallerFailure(process.ExitCode, log));
             }
             if (!File.Exists(ClientPath)) throw new IOException("No se ha encontrado el cliente instalado. Comprueba la instalación de Tailscale.");
+        }
+        public static ProcessStartInfo ClientInstallerStartInfo(string package, string log) {
+            // Normalize at the native boundary too, including paths with spaces or accents.
+            package = Path.GetFullPath(package); log = Path.GetFullPath(log);
+            return new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "msiexec.exe"),
+                "/i " + Rules.Quote(package) + " /passive /norestart /L*v " + Rules.Quote(log)) {
+                UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(package)
+            };
+        }
+        public static string ClientInstallerFailure(int code, string log) {
+            string reason = code == 1619 ? "Windows Installer no pudo abrir el paquete de Tailscale (código 1619)." :
+                code == 1618 ? "Hay otra instalación en curso (código 1618). Espera a que termine antes de reintentar." :
+                "Tailscale no se instaló (código " + code + ").";
+            return reason + " Puedes reintentarlo desde Mantenimiento. Registro: " + Path.GetFullPath(log);
         }
     }
 
