@@ -181,6 +181,14 @@ Additional safeguards prevent users from deactivating themselves or removing/dea
 
 ## Local development
 
+### Windows graphical installer
+
+An independent [Windows installer phase](deploy/windows/README.md) packages Java,
+MySQL and the web interface in `InVaultSetup.exe`, with company name, directory
+selection and a Windows service. See the [Spanish installation guide](deploy/windows/GUIA_INSTALACION_ES.md).
+The distribution and its pending clean-Windows acceptance are documented separately
+from the existing container deployment.
+
 ### Prerequisites
 
 - Java 25.

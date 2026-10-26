@@ -1,0 +1,67 @@
+name: Windows installer
+
+on:
+  pull_request:
+    paths:
+      - deploy/windows/**
+      - .github/workflows/windows-installer.yml
+  workflow_dispatch:
+    inputs:
+      build_installer:
+        description: Build and smoke-test the full offline installer
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  installer-tests:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify installer safety and data retention policies
+        shell: pwsh
+        run: ./deploy/windows/tests/run-tests.ps1 -Mode Unit
+      - name: Render the real wizard controls
+        shell: pwsh
+        run: ./deploy/windows/tests/run-tests.ps1 -Mode Render
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: windows-installer-verification
+          path: releases/windows/verification-*/
+
+  offline-installer:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_installer
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Build from an identified source snapshot
+        shell: pwsh
+        run: ./deploy/windows/build-installer.ps1
+      - name: Verify the embedded runtime and persistent MySQL database
+        shell: pwsh
+        run: ./deploy/windows/tests/run-tests.ps1 -Mode Smoke
+      - name: Retain installer and release identity
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: InVaultSetup
+          path: |
+            releases/windows/InVaultSetup.exe
+            releases/windows/InVaultSetup.exe.config
+            releases/windows/InVaultSetup.exe.sha256
+            releases/windows/package.json
+            releases/windows/source-manifest.json
+            releases/windows/build-installer.log
