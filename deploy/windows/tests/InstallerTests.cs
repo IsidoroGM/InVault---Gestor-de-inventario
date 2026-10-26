@@ -37,6 +37,8 @@ public static class InstallerTests {
         }
     }
     static void Unit() {
+        Check("native_runtime_targets_net48", AppDomain.CurrentDomain.SetupInformation.TargetFrameworkName == ".NETFramework,Version=v4.8");
+        Check("https_uses_system_tls", ServicePointManager.SecurityProtocol == SecurityProtocolType.SystemDefault);
         Rules.Company("Almacén José & Hijos"); Check("company_unicode", true);
         Reject("company_empty", () => Rules.Company(" ")); Reject("company_control", () => Rules.Company("Empresa\nInjected"));
         string a = Rules.NewCompanyId("Almacén José & Hijos"), b = Rules.NewCompanyId("Almacén José & Hijos");
